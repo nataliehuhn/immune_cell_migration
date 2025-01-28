@@ -8,6 +8,8 @@ import glob
 # speed_stepwidth_um_min
 
 MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13}
+# if measurement takes images for saved positions: 0, 4, 8, 12, 1, 5, 9, 13: skip
+# if measurement takes images for saved positions:
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}
 
 def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mode, pos_num=10):
@@ -15,6 +17,7 @@ def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mod
     thresh_motile = MOTILITY_DEFINITION[celltype]
     acq_sequential = ACQUISITION_MODE[acquisition_mode]
     cond_sets = [[d] for d in conditions]
+    print(cond_sets)
 
     for path, _ in path_list:
         print(f"Processing path: {path}")
@@ -34,6 +37,7 @@ def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mod
 
         """Main function to handle data processing and plotting."""
         num_conditions = len(conditions)
+        print("num_conditions: ", num_conditions)
         fig, axes = plt.subplots(1, num_conditions, figsize=(3*num_conditions, 3))
 
         # Ensure axes is iterable even if it's a single Axes object
@@ -43,10 +47,14 @@ def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mod
         data_per_condition = []
 
         count_cond = 0
-        condition_files = []
+        condition_files = [[] for _ in range(num_conditions)]
 
         for d in cond_sets:
-            # Process each CSV file found
+            print("d in cond_sets:", d)
+            print()
+            # Reset data_per_condition for each condition
+            data_per_condition = []
+
             filenames = glob.glob(os.path.join(path, "*" + str(thresh_motile) + "umin*.csv"))
             print(f"Found files: {filenames}")
 
@@ -55,7 +63,6 @@ def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mod
                 continue  # Skip this condition if no files are found
 
             for filename in filenames:
-                # Z:\\nhuhn\\Microscopy\\Mic2_mic3\\test_run\\0h_corrected\\20240903-004004_pos00_x00_mode0_6.5umin5min.csv
                 position_from_file = int(filename.split("_")[-4][3:])
                 print(position_from_file)
 
@@ -69,32 +76,33 @@ def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mod
                         print("skip and position not right!")
                         continue
 
-                condition_files.append(filename)
+                condition_files[count_cond].append(filename)
 
             print(condition_files)
             try:
                 # Load and aggregate all data for this condition into a single DataFrame
-                data = load_data(condition_files)
+                data = load_data(condition_files[count_cond])
                 print("len data: ", len(data))
-                # print(len(data[0]))
                 data_per_condition.append(data)
-                print("len of data_per_condition: ", len(data_per_condition))
             except ValueError as e:
                 print(e)
                 continue
-            # data_per_condition =
-            count_cond += 1
 
             if not data_per_condition:
                 raise RuntimeError("No data available for any condition.")
 
-            for ax, data, condition in zip(axes, data_per_condition, conditions):
+            print("counting cond: ", count_cond)
+            try:
+                data = load_data(condition_files[count_cond])
+                ax = axes[count_cond]
                 plt.sca(ax)
-                kde_plot(data, title=condition)
+                kde_plot(data, title=conditions[count_cond])
                 ax.set_ylim([0.1, 30])
-                circle = plt.Circle((0.65, 0.65), 0.175, color='C3', fill=False, lw=1, ls='--', transform=ax.transAxes)
-                # ax.add_patch(circle)
                 ax.set_ylabel('')
+            except ValueError as e:
+                print(e)
+                continue
+            count_cond += 1
 
         plt.tight_layout()
         plt.savefig(os.path.join(path, 'figure-kde-plot' + '.png'), dpi=200)

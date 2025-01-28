@@ -6,8 +6,9 @@ from .tracking_functions import run_tracking
 from .unet.unet_cell_detector import CellDetector
 
 TRAINED_NETWORKS = {"NK": {"trained_file": "NK_cell_weights.h5", "training_pixelsize": 6.45},
+                    "NK_day14": {"trained_file": "NK_cell_weights.h5", "training_pixelsize": 6.45},
                     "pigPBMCs": {"trained_file": "NK_cell_weights.h5", "training_pixelsize": 6.45},
-                    "Jurkat": {"trained_file": "Jurkat_cell_weights.h5", "training_pixelsize": 4.0954}}
+                    "Jurkat": {"trained_file": "NK_cell_weights.h5", "training_pixelsize": 6.45}}
 
 def track_cells(celltype, path_list, pixelsize_ccd=4.0954):
     script_dir = os.path.dirname(os.path.abspath(__file__))

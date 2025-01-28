@@ -141,12 +141,13 @@ def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, po
                 condition_pos_start = count_cond * pos_num
                 condition_pos_end = (count_cond + 1) * pos_num
                 condition_positions = pos_range[condition_pos_start:condition_pos_end]
+                print("condition_positions: ", condition_positions)
 
                 for j, pos in enumerate(condition_positions):
                     sheet2.write(1 + i + j, 0, d[0])  # Condition
                     sheet2.write(1 + i + j, 1, mf1[j] if not np.isnan(mf1[j]) else 0)  # Motile Fraction
                     sheet2.write(1 + i + j, 2, np.nanstd(mf1[j]))  # Motile Fraction std
-                    sheet2.write(1 + i + j, 3, speed1[j] if not np.isnan(speed[j]) else 0)  # Speed
+                    sheet2.write(1 + i + j, 3, speed1[j] if not np.isnan(speed1[j]) else 0)  # Speed
                     sheet2.write(1 + i + j, 4, speed_std1[j] if not np.isnan(speed_std1[j]) else 0)  # Speed std
                     sheet2.write(1 + i + j, 5, direction1[j] if not np.isnan(direction1[j]) else 0)  # Direction
                     sheet2.write(1 + i + j, 6, dir_std1[j] if not np.isnan(dir_std1[j]) else 0)  # Direction std
@@ -160,7 +161,7 @@ def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, po
 
 
                 # Set row format for better visibility
-                sheet2.set_row(1 + i, 15, format1)
+                sheet2.set_row(i, 15, format1)
 
             count_cond += 1
             sheet1.write(count_cond, 0, d[0])
