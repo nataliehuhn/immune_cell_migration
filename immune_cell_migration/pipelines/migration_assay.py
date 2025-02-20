@@ -11,7 +11,7 @@ from ..postprocessing import write_to_excel
 from .. plots import plot_kde_speed_pers
 
 
-def complete_pipeline(folder, conditions, celltype, acq_mode, savename, drift_corr=True, clickpoints_db=True, tracking=True, postprocessing=True, plotting=True, n_jobs=1):
+def complete_pipeline(folder, conditions, celltype, acq_mode, savename, drift_corr=True, clickpoints_db=True, tracking=True, postprocessing=True, plotting=True, n_jobs=1, pos_num=10, time_step=15):
     if drift_corr:
         pathlist = name_glob(os.path.join(folder, '*h'))
         print(pathlist)
@@ -44,10 +44,10 @@ def complete_pipeline(folder, conditions, celltype, acq_mode, savename, drift_co
             pathlist = name_glob(os.path.join(folder, '*h'))
             print(pathlist)
         # analyze cdb: set motile fraction definition etc
-        motility_filter_cdb.filter_cdb(celltype=celltype, path_list=pathlist, pixelsize_ccd=4.0954, objective=10, time_step=15)
+        motility_filter_cdb.filter_cdb(celltype=celltype, path_list=pathlist, pixelsize_ccd=4.0954, objective=10, time_step=time_step)
         print("cdb filtering done")
         # extract excel files
-        write_to_excel.excel_writer(celltype=celltype, path_list=pathlist, savename=savename, conditions=conditions, acquisition_mode=acq_mode, pos_num=10)
+        write_to_excel.excel_writer(celltype=celltype, path_list=pathlist, savename=savename, conditions=conditions, acquisition_mode=acq_mode, pos_num=pos_num)
         print("excel files written")
 
     if plotting:
@@ -59,6 +59,6 @@ def complete_pipeline(folder, conditions, celltype, acq_mode, savename, drift_co
             print(pathlist)
 
         # plot kde
-        plot_kde_speed_pers.generate_kde_plot(celltype=celltype, path_list=pathlist, savename=savename, conditions=conditions, acquisition_mode=acq_mode, pos_num=10)
+        plot_kde_speed_pers.generate_kde_plot(celltype=celltype, path_list=pathlist, savename=savename, conditions=conditions, acquisition_mode=acq_mode, pos_num=pos_num)
 
         # plot speed, persistence, and motile fraction

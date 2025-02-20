@@ -12,7 +12,7 @@ MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13
 # if measurement takes images for saved positions:
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}
 
-def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mode, pos_num=10):
+def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mode, pos_num):
 
     thresh_motile = MOTILITY_DEFINITION[celltype]
     acq_sequential = ACQUISITION_MODE[acquisition_mode]

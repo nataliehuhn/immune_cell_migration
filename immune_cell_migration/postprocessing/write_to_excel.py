@@ -10,7 +10,7 @@ MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}
 
 
-def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, pos_num=10):
+def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, pos_num=4):
     """
     Function to write data to an Excel file.
 
