@@ -167,5 +167,5 @@ def kde_plot(data, title='', pers_thres=0., speed_thres=0., plot_mf=True):
     plt.yscale('log')
     plt.xlabel('Persistence')
     plt.ylabel('Cell speed (µm/min)')
-    plt.title(title)
+    plt.tight_layout()
     plt.gca().set_facecolor('#E1E1E1')

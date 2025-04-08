@@ -16,7 +16,7 @@ track_type = 'nk_tracks_greedy_stitched_without_short_high_z'
 thres_speed_umpromin = 20  # Zellen, die oberhalb des Geles (=Medium) schwimmen, ignorieren
 thres_distance_pxl = 20  # 20 bei 15sec&5min
 
-def filter_cdb(celltype, path_list, pixelsize_ccd=4.0954, objective=10, time_step=15):
+def filter_cdb(celltype, time_step, path_list, pixelsize_ccd=4.0954, objective=10):
     thresh_motile = MOTILITY_DEFINITION[celltype]
     res = pixelsize_ccd/objective  # Lumenera ; 6.45/10  Hamamatsu
     save_name_csv = '_' + str(thresh_motile) + 'umin5min'
@@ -58,7 +58,7 @@ def get_speed_stepwidth(nanpadded_trackarray, time_step, res):
     # get the absolute value of these vectors
     stepwidth_pixel = np.linalg.norm(stepwidth_pixel, axis=2)
     # calculate speed in um / min
-    speed_stepwidth_um_min = ((stepwidth_pixel * res) / (time_step / 60))
+    speed_stepwidth_um_min = ((stepwidth_pixel * res) / (time_step / 60.))
     return speed_stepwidth_um_min
 
 

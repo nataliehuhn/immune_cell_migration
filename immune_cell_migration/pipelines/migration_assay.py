@@ -9,9 +9,10 @@ from ..tracking import cell_tracker
 from ..postprocessing import motility_filter_cdb
 from ..postprocessing import write_to_excel
 from .. plots import plot_kde_speed_pers
+from .. plots import plot_mf_speed_pers
 
 
-def complete_pipeline(folder, conditions, celltype, acq_mode, savename, drift_corr=True, clickpoints_db=True, tracking=True, postprocessing=True, plotting=True, n_jobs=1, pos_num=10, time_step=15):
+def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode, savename, drift_corr=True, clickpoints_db=True, tracking=True, postprocessing=True, plotting=True, n_jobs=1):
     if drift_corr:
         pathlist = name_glob(os.path.join(folder, '*h'))
         print(pathlist)
@@ -34,7 +35,7 @@ def complete_pipeline(folder, conditions, celltype, acq_mode, savename, drift_co
         else:
             pathlist = name_glob(os.path.join(folder, '*h'))
             print(pathlist)
-        cell_tracker.track_cells(celltype=celltype, path_list=pathlist, pixelsize_ccd=4.0954)
+        cell_tracker.track_cells(celltype, path_list=pathlist, pixelsize_ccd=4.0954)
 
     if postprocessing:
         if len(name_glob(os.path.join(folder, '*h_corrected'))) != 0:
@@ -44,7 +45,7 @@ def complete_pipeline(folder, conditions, celltype, acq_mode, savename, drift_co
             pathlist = name_glob(os.path.join(folder, '*h'))
             print(pathlist)
         # analyze cdb: set motile fraction definition etc
-        motility_filter_cdb.filter_cdb(celltype=celltype, path_list=pathlist, pixelsize_ccd=4.0954, objective=10, time_step=time_step)
+        motility_filter_cdb.filter_cdb(time_step=time_step, celltype=celltype, path_list=pathlist, pixelsize_ccd=4.0954, objective=10)
         print("cdb filtering done")
         # extract excel files
         write_to_excel.excel_writer(celltype=celltype, path_list=pathlist, savename=savename, conditions=conditions, acquisition_mode=acq_mode, pos_num=pos_num)
@@ -59,6 +60,6 @@ def complete_pipeline(folder, conditions, celltype, acq_mode, savename, drift_co
             print(pathlist)
 
         # plot kde
-        plot_kde_speed_pers.generate_kde_plot(celltype=celltype, path_list=pathlist, savename=savename, conditions=conditions, acquisition_mode=acq_mode, pos_num=pos_num)
-
+        plot_kde_speed_pers.generate_kde_plot(celltype, path_list=pathlist, savename=savename, conditions=conditions, acquisition_mode=acq_mode, pos_num=pos_num)
+        plot_mf_speed_pers.plot_motile_fractions(parent_folder=folder)
         # plot speed, persistence, and motile fraction
