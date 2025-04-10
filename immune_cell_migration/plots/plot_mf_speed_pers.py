@@ -16,7 +16,7 @@ def extract_timepoint(folder_name):
     return os.path.basename(folder_name).split('_')[0]
 
 
-def plot_motile_fractions(parent_folder):
+def plot_motile_fractions(parent_folder, custom_order):
     """Generates motile fraction plots for each time step from Excel files in a parent folder."""
 
     # Dictionary to store data for different time points
@@ -45,8 +45,14 @@ def plot_motile_fractions(parent_folder):
         # Generate improved plots
     for timepoint, data_list in data_by_timepoint.items():
         combined_data = pd.concat(data_list, ignore_index=True)
+        combined_data["condition"] = pd.Categorical(
+            combined_data["condition"],
+            categories=custom_order,
+            ordered=True
+        )
+        combined_data = combined_data.sort_values("condition").reset_index(drop=True)
 
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(8, 6))
         ax = sns.barplot(
             data=combined_data,
             x="condition",
@@ -56,21 +62,27 @@ def plot_motile_fractions(parent_folder):
         )
 
         # Thinner bars manually
-        bar_width = 0.6
+        bar_width = 0.5
         for i, bar in enumerate(ax.patches):
             bar.set_width(bar_width)
             bar.set_x(bar.get_x() + (1 - bar_width) / 2)
 
+        # Center x-ticks under the bars
+        tick_positions = [bar.get_x() + bar.get_width() / 2 for bar in ax.patches]
+        ax.set_xticks(tick_positions)
+        ax.set_xticklabels(combined_data["condition"])
+
         # Add error bars manually
-        for i, row in combined_data.iterrows():
+        for bar, (_, row) in zip(ax.patches, combined_data.iterrows()):
+            bar_center = bar.get_x() + bar.get_width() / 2
             ax.errorbar(
-                x=i,
-                y=row["motile fraction calculated from tracks"],
-                yerr=row["mf_std"],
+                x=bar_center,
+                y=row["motile fraction calculated from tracks"],  # or "persistence"
+                yerr=row["mf_std"],  # or "persistence_std"
                 fmt='none',
                 c='black',
-                capsize=5,
-                lw=1.5
+                capsize=4,
+                lw=1.2
             )
 
         # Add labels on bars
@@ -78,9 +90,9 @@ def plot_motile_fractions(parent_folder):
             height = p.get_height()
             # ax.annotate(f'{height:.1f}', (p.get_x() + p.get_width() / 2., height), ha='center', va='bottom', fontsize=9, color='black')
 
-        plt.xticks(rotation=45, ha="right")
-        plt.ylabel("Motile Fraction (%)", fontsize=14)
-        plt.xlabel("Condition", fontsize=14)
+        plt.xticks(rotation=45, ha="right", fontsize=16)
+        plt.ylabel("Motile Fraction (%)", fontsize=16)
+        plt.xlabel("Condition", fontsize=16)
         plt.title(f"Motile Fractions at {timepoint}", fontsize=18, weight='bold')
         plt.tight_layout()
 
@@ -90,7 +102,7 @@ def plot_motile_fractions(parent_folder):
         plt.close()
     print(f"Plots saved in respective timepoint folders")
 
-def plot_speed(parent_folder):
+def plot_speed(parent_folder, custom_order):
     """Generates speed plots for each time step from Excel/CSV files."""
     sns.set(style="whitegrid")
     data_by_timepoint = {}
@@ -113,6 +125,12 @@ def plot_speed(parent_folder):
     # Generate plots
     for timepoint, data_list in data_by_timepoint.items():
         combined_data = pd.concat(data_list, ignore_index=True)
+        combined_data["condition"] = pd.Categorical(
+            combined_data["condition"],
+            categories=custom_order,
+            ordered=True
+        )
+        combined_data = combined_data.sort_values("condition").reset_index(drop=True)
 
         plt.figure(figsize=(10, 6))
         ax = sns.barplot(
@@ -129,16 +147,22 @@ def plot_speed(parent_folder):
             bar.set_width(bar_width)
             bar.set_x(bar.get_x() + (1 - bar_width) / 2)
 
+        # Center x-ticks under the bars
+        tick_positions = [bar.get_x() + bar.get_width() / 2 for bar in ax.patches]
+        ax.set_xticks(tick_positions)
+        ax.set_xticklabels(combined_data["condition"])
+
         # Add error bars manually
-        for i, row in combined_data.iterrows():
+        for bar, (_, row) in zip(ax.patches, combined_data.iterrows()):
+            bar_center = bar.get_x() + bar.get_width() / 2
             ax.errorbar(
-                x=i,
-                y=row["speed [µm/min]"],
-                yerr=row["speed_std"],
+                x=bar_center,
+                y=row["speed [µm/min]"],  # or "persistence"
+                yerr=row["speed_std"],  # or "persistence_std"
                 fmt='none',
                 c='black',
-                capsize=5,
-                lw=1.5
+                capsize=4,
+                lw=1.2
             )
 
         # Add data labels on bars
@@ -146,9 +170,9 @@ def plot_speed(parent_folder):
             height = p.get_height()
             # ax.annotate(f'{height:.2f}', (p.get_x() + p.get_width() / 2., height), ha='center', va='bottom', fontsize=9, color='black')
 
-        plt.xticks(rotation=45, ha="right")
-        plt.ylabel("Speed [µm/min]", fontsize=14)
-        plt.xlabel("Condition", fontsize=14)
+        plt.xticks(rotation=45, ha="right", fontsize=16)
+        plt.ylabel("Speed [µm/min]", fontsize=16)
+        plt.xlabel("Condition", fontsize=16)
         plt.title(f"Speed per Condition at {timepoint}", fontsize=18, weight='bold')
         plt.tight_layout()
 
@@ -159,7 +183,7 @@ def plot_speed(parent_folder):
 
     print("Speed plots saved in respective timepoint folders.")
 
-def plot_persistence(parent_folder):
+def plot_persistence(parent_folder, custom_order):
     """Generates persistence plots for each time step from Excel/CSV files."""
     sns.set(style="whitegrid")
     data_by_timepoint = {}
@@ -182,6 +206,12 @@ def plot_persistence(parent_folder):
     # Generate plots
     for timepoint, data_list in data_by_timepoint.items():
         combined_data = pd.concat(data_list, ignore_index=True)
+        combined_data["condition"] = pd.Categorical(
+            combined_data["condition"],
+            categories=custom_order,
+            ordered=True
+        )
+        combined_data = combined_data.sort_values("condition").reset_index(drop=True)
 
         plt.figure(figsize=(10, 6))
         ax = sns.barplot(
@@ -198,16 +228,22 @@ def plot_persistence(parent_folder):
             bar.set_width(bar_width)
             bar.set_x(bar.get_x() + (1 - bar_width) / 2)
 
+        # Center x-ticks under the bars
+        tick_positions = [bar.get_x() + bar.get_width() / 2 for bar in ax.patches]
+        ax.set_xticks(tick_positions)
+        ax.set_xticklabels(combined_data["condition"])
+
         # Add error bars manually
-        for i, row in combined_data.iterrows():
+        for bar, (_, row) in zip(ax.patches, combined_data.iterrows()):
+            bar_center = bar.get_x() + bar.get_width() / 2
             ax.errorbar(
-                x=i,
-                y=row["persistence"],
-                yerr=row["persistence_std"],
+                x=bar_center,
+                y=row["persistence"],  # or "persistence"
+                yerr=row["persistence_std"],  # or "persistence_std"
                 fmt='none',
                 c='black',
-                capsize=5,
-                lw=1.5
+                capsize=4,
+                lw=1.2
             )
 
         # Add data labels
@@ -215,7 +251,7 @@ def plot_persistence(parent_folder):
             height = p.get_height()
             # ax.annotate(f'{height:.2f}', (p.get_x() + p.get_width() / 2., height), ha='center', va='bottom', fontsize=9, color='black')
 
-        plt.xticks(rotation=45, ha="right")
+        plt.xticks(rotation=45, ha="right", fontsize=16)
         plt.ylabel("Persistence", fontsize=16)
         plt.xlabel("Condition", fontsize=16)
         plt.title(f"Persistence per Condition at {timepoint}", fontsize=18, weight='bold')

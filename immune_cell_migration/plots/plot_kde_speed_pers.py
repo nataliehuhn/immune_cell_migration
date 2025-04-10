@@ -13,11 +13,11 @@ MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}
 UPPER_LIMIT_KDE = {"NK": 30, "NK_day14": 30, "Jurkat": 15}
 
-def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mode, pos_num):
-
+def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mode, pos_num, custom_order):
     thresh_motile = MOTILITY_DEFINITION[celltype]
     acq_sequential = ACQUISITION_MODE[acquisition_mode]
     upper_limit = UPPER_LIMIT_KDE[celltype]
+
     cond_sets = [[d] for d in conditions]
     print(cond_sets)
 
@@ -53,9 +53,6 @@ def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mod
 
         for d in cond_sets:
             print("d in cond_sets:", d)
-            print()
-            # Reset data_per_condition for each condition
-            data_per_condition = []
 
             filenames = glob.glob(os.path.join(path, "*" + str(thresh_motile) + "umin*.csv"))
             print(f"Found files: {filenames}")
@@ -93,6 +90,8 @@ def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mod
             if not data_per_condition:
                 raise RuntimeError("No data available for any condition.")
 
+            count_cond += 1
+            """
             print("counting cond: ", count_cond)
             try:
                 data = load_data(condition_files[count_cond])
@@ -110,7 +109,28 @@ def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mod
         plt.savefig(os.path.join(path, 'figure-kde-plot' + '.png'), dpi=200)
         plt.show(block=False)
         plt.close()
+        """
+        for plot_idx, condition_name in enumerate(custom_order):
+            if condition_name not in conditions:
+                print(f"Warning: '{condition_name}' not found in loaded conditions.")
+                continue
 
+            original_idx = conditions.index(condition_name)
+            print("original index: ", original_idx)
+            print("index now:", plot_idx)
+            print("condition_name: ", condition_name)
+            print("len data_per_condition: ", len(data_per_condition))
+            data = data_per_condition[original_idx]
+            ax = axes[plot_idx]
+            plt.sca(ax)
+            kde_plot(data, title=condition_name)
+            ax.set_ylim([0.1, upper_limit])
+            ax.set_ylabel('Speed [µm/min]')
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(path, 'figure-kde-plot' + '.png'), dpi=200)
+        plt.show(block=False)
+        plt.close()
 
 def load_data(files):
     """Load and preprocess data from CSV files."""
@@ -143,7 +163,7 @@ def load_data(files):
     return combined_data
 
 
-def kde_plot(data, title='', pers_thres=0., speed_thres=0., plot_mf=True):
+def kde_plot(data, title, pers_thres=0., speed_thres=0., plot_mf=True):
     """Create a KDE plot."""
     if data.empty:
         raise ValueError("Data for plotting is empty.")
@@ -169,5 +189,6 @@ def kde_plot(data, title='', pers_thres=0., speed_thres=0., plot_mf=True):
     plt.yscale('log')
     plt.xlabel('Persistence')
     plt.ylabel('Cell speed (µm/min)')
+    plt.title(title)
     plt.tight_layout()
     plt.gca().set_facecolor('#E1E1E1')

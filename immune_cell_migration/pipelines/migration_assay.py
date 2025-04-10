@@ -12,7 +12,7 @@ from .. plots import plot_kde_speed_pers
 from .. plots import plot_mf_speed_pers
 
 
-def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode, savename, drift_corr=True, clickpoints_db=True, tracking=True, postprocessing=True, plotting=True, n_jobs=1):
+def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode, savename, order, drift_corr=True, clickpoints_db=True, tracking=True, postprocessing=True, plotting=True, n_jobs=1):
     if drift_corr:
         pathlist = name_glob(os.path.join(folder, '*h'))
         print(pathlist)
@@ -60,12 +60,12 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
             print(pathlist)
 
         # plot kde
-        plot_kde_speed_pers.generate_kde_plot(celltype, path_list=pathlist, savename=savename, conditions=conditions, acquisition_mode=acq_mode, pos_num=pos_num)
+        plot_kde_speed_pers.generate_kde_plot(celltype, path_list=pathlist, savename=savename, conditions=conditions, acquisition_mode=acq_mode, pos_num=pos_num, custom_order=order)
 
         # plot speed, persistence, and motile fraction
-        plot_mf_speed_pers.plot_motile_fractions(parent_folder=folder)
-        plot_mf_speed_pers.plot_speed(parent_folder=folder)
-        plot_mf_speed_pers.plot_persistence(parent_folder=folder)
+        #plot_mf_speed_pers.plot_motile_fractions(parent_folder=folder, custom_order=order)
+        #plot_mf_speed_pers.plot_speed(parent_folder=folder, custom_order=order)
+        #plot_mf_speed_pers.plot_persistence(parent_folder=folder, custom_order=order)
 
         # pool data from different experiments
 
