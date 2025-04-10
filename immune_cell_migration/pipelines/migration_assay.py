@@ -61,5 +61,12 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
 
         # plot kde
         plot_kde_speed_pers.generate_kde_plot(celltype, path_list=pathlist, savename=savename, conditions=conditions, acquisition_mode=acq_mode, pos_num=pos_num)
-        plot_mf_speed_pers.plot_motile_fractions(parent_folder=folder)
+
         # plot speed, persistence, and motile fraction
+        plot_mf_speed_pers.plot_motile_fractions(parent_folder=folder)
+        plot_mf_speed_pers.plot_speed(parent_folder=folder)
+        plot_mf_speed_pers.plot_persistence(parent_folder=folder)
+
+        # pool data from different experiments
+
+        # compare data over time steps

@@ -11,11 +11,13 @@ MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13
 # if measurement takes images for saved positions: 0, 4, 8, 12, 1, 5, 9, 13: skip
 # if measurement takes images for saved positions:
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}
+UPPER_LIMIT_KDE = {"NK": 30, "NK_day14": 30, "Jurkat": 15}
 
 def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mode, pos_num):
 
     thresh_motile = MOTILITY_DEFINITION[celltype]
     acq_sequential = ACQUISITION_MODE[acquisition_mode]
+    upper_limit = UPPER_LIMIT_KDE[celltype]
     cond_sets = [[d] for d in conditions]
     print(cond_sets)
 
@@ -97,8 +99,8 @@ def generate_kde_plot(celltype, path_list, savename, conditions, acquisition_mod
                 ax = axes[count_cond]
                 plt.sca(ax)
                 kde_plot(data, title=conditions[count_cond])
-                ax.set_ylim([0.1, 30])
-                ax.set_ylabel('')
+                ax.set_ylim([0.1, upper_limit])
+                ax.set_ylabel('Speed [µm/min]')
             except ValueError as e:
                 print(e)
                 continue
