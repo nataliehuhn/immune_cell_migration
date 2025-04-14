@@ -1,15 +1,11 @@
-import numpy as np
 import pandas as pd
-from glob import glob
 import os
-import glob
-from scipy.stats import shapiro, wilcoxon, ttest_rel, ttest_ind, mannwhitneyu, ranksums
 import matplotlib.pyplot as plt
-from ..utils import get_data
 import seaborn as sns
 
 MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13}
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}
+
 
 def extract_timepoint(folder_name):
     """Extracts the time point (e.g., '0h', '6h') from the folder name."""
@@ -25,7 +21,7 @@ def plot_motile_fractions(parent_folder, custom_order):
     # Traverse the parent folder
     for root, _, files in os.walk(parent_folder):
         for file in files:
-            if file.endswith(".xlsx") or file.endswith(".csv"):
+            if file.endswith("results*.xlsx") or file.endswith("results*.csv"):
                 file_path = os.path.join(root, file)
                 timepoint = extract_timepoint(root)
 
@@ -70,7 +66,8 @@ def plot_motile_fractions(parent_folder, custom_order):
         # Center x-ticks under the bars
         tick_positions = [bar.get_x() + bar.get_width() / 2 for bar in ax.patches]
         ax.set_xticks(tick_positions)
-        ax.set_xticklabels(combined_data["condition"])
+        grouped = combined_data.groupby("condition")
+        ax.set_xticklabels(grouped.indices)
 
         # Add error bars manually
         for bar, (_, row) in zip(ax.patches, combined_data.iterrows()):
@@ -150,7 +147,8 @@ def plot_speed(parent_folder, custom_order):
         # Center x-ticks under the bars
         tick_positions = [bar.get_x() + bar.get_width() / 2 for bar in ax.patches]
         ax.set_xticks(tick_positions)
-        ax.set_xticklabels(combined_data["condition"])
+        grouped = combined_data.groupby("condition")
+        ax.set_xticklabels(grouped.indices)
 
         # Add error bars manually
         for bar, (_, row) in zip(ax.patches, combined_data.iterrows()):
@@ -231,7 +229,8 @@ def plot_persistence(parent_folder, custom_order):
         # Center x-ticks under the bars
         tick_positions = [bar.get_x() + bar.get_width() / 2 for bar in ax.patches]
         ax.set_xticks(tick_positions)
-        ax.set_xticklabels(combined_data["condition"])
+        grouped = combined_data.groupby("condition")
+        ax.set_xticklabels(grouped.indices)
 
         # Add error bars manually
         for bar, (_, row) in zip(ax.patches, combined_data.iterrows()):

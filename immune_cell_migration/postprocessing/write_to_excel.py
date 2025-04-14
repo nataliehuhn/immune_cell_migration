@@ -10,7 +10,7 @@ MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}
 
 
-def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, pos_num=4):
+def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, pos_num):
     """
     Function to write data to an Excel file.
 
@@ -40,7 +40,7 @@ def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, po
         # Column headers
         xlwt_col = ['condition', 'mf [%]', 'mf_std', 'speed [µm/min]', 'speed_std', 'persistence',
                     'persistence_std', 'all_tracks', 'motile_tracks', 'motile fraction calculated from tracks',
-                    '# positions', 'speed stepwidth [µm/min]', 'speed stp std']
+                    '# positions', 'speed stepwidth [µm/min]', 'speed stp std', 'persistent fraction', 'persistent fraction std']
         [sheet1.write(0, i, t, bold) for i, t in enumerate(xlwt_col)]
         [sheet2.write(0, i, t, bold) for i, t in enumerate(xlwt_col)]
 
@@ -52,10 +52,9 @@ def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, po
             speed1, speed_std1, speedstp1, speedstp_std1 = [], [], [], []
             direction1, dir_std1 = [], []
             mf1, mf_std1 = [], []
+            pf1, pf_std1 = [], []
             alltracks1, mottracks1 = [], []
             all_pos = []
-
-            
 
             filenames = glob.glob(os.path.join(path, "*" + str(thresh_motile) + "umin*.csv"))
             print(f"Found files: {filenames}")
@@ -94,6 +93,11 @@ def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, po
                 motileCells1 = data.loc[data.motile == True]
                 alltracks1.append(len(data))
                 mottracks1.append(len(motileCells1))
+                # Motile fraction
+                # motile1 = [data[['motile', 'file']].groupby(['file']).mean().motile[i] for i in range(len(data))]
+                motile1 = [data[['motile', 'file']].groupby(['file']).mean().motile[i] for i in range(0, len(data[['motile', 'file']].groupby(['file']).mean().motile))]
+                mf1.append(np.nanmean(motile1) * 100)
+                print(len(mf1))
 
                 # Speed calculations
                 sp = motileCells1[['speed_boundingbox_um_min']]
@@ -107,13 +111,11 @@ def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, po
                 # Direction and persistence calculations
                 dir1 = motileCells1[['cos_angle']]
                 direction1.append(dir1.mean()[0])
-                dir_std1.append(dir1.sem()[0])
+                dir_std1.append(dir1.sem()[0])# Persistent fraction calculations over all cells
 
-                # Motile fraction
-                # motile1 = [data[['motile', 'file']].groupby(['file']).mean().motile[i] for i in range(len(data))]
-                motile1 = [data[['motile', 'file']].groupby(['file']).mean().motile[i] for i in range(0, len(data[['motile', 'file']].groupby(['file']).mean().motile))]
-                mf1.append(np.nanmean(motile1) * 100)
-                print(len(mf1))
+                persistentCells_all = data.loc[data.cos_angle > 0]
+                pf1.append(len(persistentCells_all) / len(data) if len(data) != 0 else 0)
+                pf_std1.append(np.std(pf1))
 
             # Handle writing data based on whether the positions are sorted or dynamically allocated
             i = count_cond * pos_num
@@ -134,6 +136,9 @@ def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, po
                     sheet2.write(1 + i + j, 11, speedstp1[j]if not np.isnan(speedstp1[j]) else 0)  # Speed step width
                     sheet2.write(1 + i + j, 12,
                                  speedstp_std1[j] if not np.isnan(speedstp_std1[j]) else 0)  # Speed step std
+                    sheet2.write(1 + i + j, 13, pf1[j] if not np.isnan(pf1[j]) else 0)
+                    sheet2.write(1 + i + j, 13, pf_std1[j] if not np.isnan(pf_std1[j]) else 0)
+
             if acq_sequential:
                 # If positions are dynamically allocated across conditions, distribute them based on number of conditions
                 total_positions = pos_num * len(conditions)
@@ -158,10 +163,11 @@ def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, po
                     sheet2.write(1 + i + j, 11, speedstp1[j] if not np.isnan(speedstp1[j]) else 0)  # Speed step width
                     sheet2.write(1 + i + j, 12,
                                  speedstp_std1[j] if not np.isnan(speedstp_std1[j]) else 0)  # Speed step std
-
+                    sheet2.write(1 + i + j, 13, pf1[j] if not np.isnan(pf1[j]) else 0)
+                    sheet2.write(1 + i + j, 13, pf_std1[j] if not np.isnan(pf_std1[j]) else 0)
 
                 # Set row format for better visibility
-                sheet2.set_row(i, 15, format1)
+                sheet2.set_row(i, 16, format1)
 
             count_cond += 1
             sheet1.write(count_cond, 0, d[0])
@@ -174,8 +180,10 @@ def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, po
             sheet1.write(count_cond, 7, str(np.sum(alltracks1)))
             sheet1.write(count_cond, 8, str(np.sum(mottracks1)))
             sheet1.write(count_cond, 9, str((np.sum(mottracks1) / np.sum(alltracks1)) * 100))
-            sheet1.write(count_cond, 10, str(len(filename)))
+            sheet1.write(count_cond, 10, str(len(filenames)))
             sheet1.write(count_cond, 11, (np.nanmean(np.where(np.isnan(speedstp1), 0, speedstp1))))
             sheet1.write(count_cond, 12, (np.nanmean(np.where(np.isnan(speedstp_std1), 0, speedstp_std1))))
+            sheet1.write(count_cond, 13, (np.nanmean(np.where(np.isnan(pf1), 0, pf1))))
+            sheet1.write(count_cond, 14, (np.nanmean(np.where(np.isnan(pf_std1), 0, pf_std1))))
 
         wb.close()
