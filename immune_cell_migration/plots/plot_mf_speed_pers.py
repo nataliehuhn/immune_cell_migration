@@ -21,7 +21,7 @@ def plot_motile_fractions(parent_folder, custom_order):
     # Traverse the parent folder
     for root, _, files in os.walk(parent_folder):
         for file in files:
-            if file.endswith("results*.xlsx") or file.endswith("results*.csv"):
+            if file.endswith(".xlsx") or file.endswith(".csv"):
                 file_path = os.path.join(root, file)
                 timepoint = extract_timepoint(root)
 
