@@ -10,7 +10,7 @@ TRAINED_NETWORKS = {"NK": {"trained_file": "NK_cell_weights.h5", "training_pixel
                     "pigPBMCs": {"trained_file": "NK_cell_weights.h5", "training_pixelsize": 6.45},
                     "Jurkat": {"trained_file": "NK_cell_weights.h5", "training_pixelsize": 6.45}}
 
-def track_cells(celltype, path_list, pixelsize_ccd=4.0954):
+def track_cells(celltype, path_list, pixelsize_ccd=3.45):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     print(os.path.join(script_dir, TRAINED_NETWORKS[celltype]["trained_file"]))
     trained_network = os.path.join(script_dir, TRAINED_NETWORKS[celltype]["trained_file"])

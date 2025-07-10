@@ -8,6 +8,7 @@ from pathlib import Path
 def extract_timepoint(folder_name):
     return os.path.basename(folder_name).split('_')[0]
 
+
 def plot_persistent_fraction(parent_folder, custom_order):
     """Generates persistent fraction plots for each time step from Excel or CSV files."""
 
@@ -67,7 +68,8 @@ def plot_persistent_fraction(parent_folder, custom_order):
         ax.set_xticks(tick_positions)
 
         # Set x-tick labels correctly
-        unique_conditions = combined_data["condition"].unique()
+        unique_conditions = combined_data["condition"].dropna().unique()
+        print(unique_conditions)
         ax.set_xticklabels(unique_conditions)
 
         # Add error bars manually
