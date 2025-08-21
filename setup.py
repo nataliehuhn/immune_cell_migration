@@ -10,5 +10,5 @@ setup(
     license="MIT",
     packages=find_packages(),
     zip_safe=False,
-    install_requires=["numpy", "joblib", "tifffile", "matplotlib", "natsort", "scipy", "scikit-image", "clickpoints", "peewee", "tqdm", "tensorflow", "keras"]
+    install_requires=["numpy", "joblib", "tifffile", "matplotlib", "natsort", "scipy", "scikit-image", "clickpoints", "peewee", "tqdm", "tensorflow==2.15", "keras"]
 )
