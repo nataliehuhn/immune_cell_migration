@@ -5,18 +5,18 @@ import os
 from .tracking_functions import run_tracking
 from .unet.unet_cell_detector import CellDetector
 
-TRAINED_NETWORKS = {"NK": {"trained_file": "NK_cell_weights.h5", "training_pixelsize": 6.45},
+TRAINED_NETWORKS = {"NK": {"trained_file": "NK_cell_weights_test_new_camera1.h5", "training_pixelsize": 6.45},
                     "NK_day14": {"trained_file": "NK_cell_weights.h5", "training_pixelsize": 6.45},
                     "pigPBMCs": {"trained_file": "NK_cell_weights.h5", "training_pixelsize": 6.45},
                     "Jurkat": {"trained_file": "NK_cell_weights.h5", "training_pixelsize": 6.45}}
 
-def track_cells(celltype, path_list, pixelsize_ccd=3.45):
+def track_cells(celltype, path_list, pixelsize_ccd=4.56):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     print(os.path.join(script_dir, TRAINED_NETWORKS[celltype]["trained_file"]))
     trained_network = os.path.join(script_dir, TRAINED_NETWORKS[celltype]["trained_file"])
     # r"Z:\nhuhn\Python\LucasNKMasksAndTracking_RichiePandas\weightsLucas\NK_cell_weigths_copy.h5"
 
-    zoomed = pixelsize_ccd / TRAINED_NETWORKS[celltype]["training_pixelsize"]  # Lumenera   #6.45/6.45  #Hamamatsu
+    zoomed = pixelsize_ccd / TRAINED_NETWORKS[celltype]["training_pixelsize"]  # 4.56 Lumenera   #6.45/6.45  #Hamamatsu
     detector = CellDetector(trained_network, zoom_factor=zoomed)
 
     for path, _ in path_list:

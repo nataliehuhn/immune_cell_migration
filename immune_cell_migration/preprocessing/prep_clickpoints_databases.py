@@ -98,4 +98,3 @@ def create_database(database_name, pic_path):
     db.db.close()
 
 
-

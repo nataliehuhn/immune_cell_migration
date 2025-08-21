@@ -16,7 +16,8 @@ track_type = 'nk_tracks_greedy_stitched_without_short_high_z'
 thres_speed_umpromin = 20  # Zellen, die oberhalb des Geles (=Medium) schwimmen, ignorieren
 thres_distance_pxl = 20  # 20 bei 15sec&5min
 
-def filter_cdb(celltype, time_step, path_list, pixelsize_ccd=3.45, objective=10): #pixelsize 3.45 or 4.56
+
+def filter_cdb(celltype, time_step, path_list, pixelsize_ccd=4.56, objective=10): #pixelsize 3.45 or 4.56
     thresh_motile = MOTILITY_DEFINITION[celltype]
     res = pixelsize_ccd/objective  # Lumenera ; 6.45/10  Hamamatsu
     save_name_csv = '_' + str(thresh_motile) + 'umin5min'

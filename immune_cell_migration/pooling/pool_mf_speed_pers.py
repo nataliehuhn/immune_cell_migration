@@ -110,17 +110,17 @@ def plot_pooled_metric(folders, custom_order, value_col, error_col, ylabel, outp
         ax = plt.gca()
 
         # Summary per condition
-        summary_df = combined_data.groupby("condition").agg({
-            value_col: "mean",
-            error_col: "mean"
-        }).reindex(custom_order).reset_index()
+        summary_df = combined_data.groupby("condition").agg(
+            mean_value=(value_col, "mean"),
+            sem_value=(value_col, "sem")  # or "std" if you want standard deviation
+        ).reindex(custom_order).reset_index()
 
         # Bar plot
         bar_width = 0.4
         bars = sns.barplot(
             data=summary_df,
             x="condition",
-            y=value_col,
+            y="mean_value",
             order=custom_order,
             color="steelblue",
             edgecolor="black",
@@ -139,8 +139,8 @@ def plot_pooled_metric(folders, custom_order, value_col, error_col, ylabel, outp
         for i, (_, row) in enumerate(summary_df.iterrows()):
             ax.errorbar(
                 x=bar_centers[i],
-                y=row[value_col],
-                yerr=row[error_col],
+                y=row["mean_value"],
+                yerr=row["sem_value"],
                 fmt='none',
                 c='black',
                 capsize=4,
