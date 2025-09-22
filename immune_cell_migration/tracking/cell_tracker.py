@@ -5,7 +5,7 @@ import os
 from .tracking_functions import run_tracking
 from .unet.unet_cell_detector import CellDetector
 
-TRAINED_NETWORKS = {"NK": {"trained_file": "NK_cell_weights_test_new_camera1.h5", "training_pixelsize": 6.45},
+TRAINED_NETWORKS = {"NK": {"trained_file": "NK_cell_weights.h5", "training_pixelsize": 6.45},
                     "NK_day14": {"trained_file": "NK_cell_weights.h5", "training_pixelsize": 6.45},
                     "pigPBMCs": {"trained_file": "NK_cell_weights.h5", "training_pixelsize": 6.45},
                     "Jurkat": {"trained_file": "NK_cell_weights.h5", "training_pixelsize": 6.45}}
