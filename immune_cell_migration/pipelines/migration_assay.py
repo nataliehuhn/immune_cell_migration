@@ -41,7 +41,7 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
         else:
             pathlist = name_glob(os.path.join(folder, '*h'))
             print(pathlist)
-        cell_tracker.track_cells(celltype, path_list=pathlist, pixelsize_ccd=3.45) #4.56 Lumenera
+        cell_tracker.track_cells(celltype, path_list=pathlist, pixelsize_ccd=4.56) #4.56 Lumenera, 3.45 Basler
 
     if postprocessing:
         if len(name_glob(os.path.join(folder, '*h_corrected'))) != 0:
@@ -51,7 +51,7 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
             pathlist = name_glob(os.path.join(folder, '*h'))
             print(pathlist)
         # analyze cdb: set motile fraction definition etc
-        motility_filter_cdb.filter_cdb(time_step=time_step, celltype=celltype, path_list=pathlist, pixelsize_ccd=3.45, objective=10) #4.56 Lumenera
+        motility_filter_cdb.filter_cdb(time_step=time_step, celltype=celltype, path_list=pathlist, pixelsize_ccd=4.56, objective=10) #4.56 Lumenera, 3.45 Basler
         print("cdb filtering done")
         # extract excel files
         write_to_excel.excel_writer(celltype=celltype, path_list=pathlist, savename=savename, conditions=conditions, acquisition_mode=acq_mode, pos_num=pos_num)
