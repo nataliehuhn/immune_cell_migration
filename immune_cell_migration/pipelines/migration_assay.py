@@ -22,7 +22,7 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
         pathlist = name_glob(os.path.join(folder, '*h'))
         print(pathlist)
         for path, _ in pathlist:
-            num_pos = len(glob(os.path.join(path, "*rep*_pos*zMaxProj.tif")))
+            num_pos = len(conditions) * pos_num
             print(num_pos)
             positions = np.arange(0, num_pos, 1)
             long_measurements = False
