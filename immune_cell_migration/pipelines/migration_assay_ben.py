@@ -25,13 +25,14 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
         pathlist = name_glob(os.path.join(folder, '*h'))
         print(pathlist)
         for path, _ in pathlist:
-            num_pos = len(glob(os.path.join(path, "*rep*_pos*zMaxProj.tif")))
+            num_pos = len(conditions) * pos_num
             print(num_pos)
             positions = np.arange(0, num_pos, 1)
             long_measurements = False
             outfolder = path + '_corrected'
             print(outfolder)
             Parallel(n_jobs=n_jobs)(delayed(correct_drift)(path, pos, outfolder, long_measurements) for pos in positions)
+
 
     if clickpoints_db:
         pathlist = name_glob(os.path.join(folder, '*h_corrected'))

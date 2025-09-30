@@ -14,7 +14,6 @@ def track_cells(celltype, path_list, pixelsize_ccd=4.56):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     print(os.path.join(script_dir, TRAINED_NETWORKS[celltype]["trained_file"]))
     trained_network = os.path.join(script_dir, TRAINED_NETWORKS[celltype]["trained_file"])
-    # r"Z:\nhuhn\Python\LucasNKMasksAndTracking_RichiePandas\weightsLucas\NK_cell_weigths_copy.h5"
 
     zoomed = pixelsize_ccd / TRAINED_NETWORKS[celltype]["training_pixelsize"]  # 4.56 Lumenera   #6.45/6.45  #Hamamatsu
     detector = CellDetector(trained_network, zoom_factor=zoomed)
