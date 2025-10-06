@@ -1,4 +1,5 @@
 import os
+import clickpoints
 from glob import glob
 import torch
 import torch.nn as nn
@@ -8,7 +9,9 @@ from tifffile import imread
 from tqdm import tqdm
 import matplotlib.cm as cm
 import scipy.ndimage as ndi
+import matplotlib.pyplot as plt
 from skimage.morphology import remove_small_objects, binary_opening, binary_closing, disk
+from scipy.ndimage import zoom
 
 
 TRAINED_NETWORKS = {"NK": {"trained_file": "best_model_finding.pth", "training_pixelsize": 4.56}}
@@ -16,6 +19,13 @@ TRAINED_NETWORKS = {"NK": {"trained_file": "best_model_finding.pth", "training_p
 # ----------------------------
 # Utilities
 # ----------------------------
+def upsample(img, H_orig, W_orig):
+    """Upsample image to original size."""
+    H, W = img.shape[:2]
+    h2, w2 = H_orig, W_orig
+    z_up = (h2 / H, w2 / W) if img.ndim == 2 else (h2 / H, w2 / W, 1.0)
+    return zoom(img, z_up, order=1, grid_mode=True)
+
 
 def pad_to_divisible(img, div=32):
     """Pad image to multiples of div in H/W dimensions."""
@@ -143,7 +153,7 @@ def predict_cells_unet(pathlist, celltype):
         mask_dir = os.path.join(base_dir, "masks")
         os.makedirs(mask_dir, exist_ok=True)
 
-        tiff_files = sorted(glob(os.path.join(composites_dir, "*.tiff")))
+        tiff_files = sorted(glob(os.path.join(composites_dir, "*.tif")))
         if not tiff_files:
             print(f"No composite TIFF files found in {composites_dir}")
             continue
@@ -167,7 +177,7 @@ def predict_cells_unet(pathlist, celltype):
 
                 # Save mask (use Zmin channel = channel 4 as base)
                 mask_img = (np.clip(img_stack[4] * pred_bin, 0, 1) * 255).astype(np.uint8)
-                mask_out = os.path.join(mask_dir, os.path.splitext(os.path.basename(f))[0] + "_mask.tif")
+                mask_out = os.path.join(mask_dir, os.path.basename(f))
 
                 pal_img = Image.fromarray(mask_img, mode='P')
                 pal_img.putpalette(JET_PAL)
@@ -175,3 +185,21 @@ def predict_cells_unet(pathlist, celltype):
 
             except Exception as e:
                 print(f"Error processing {f}: {e}")
+
+
+def write_masks_to_cdb(pathlist):
+    for item in pathlist:
+        base_dir = item[0]
+        cdb_files = sorted(glob(os.path.join(base_dir, '*.cdb')))
+
+        for cdb_file in cdb_files:
+            with clickpoints.DataFile(cdb_file) as cdb:
+                minproj_images = [x for x in cdb.getImages() if (x.layer.name == 'MinProj')]
+
+                for minproj_image in minproj_images:
+                    mask_raw = plt.imread(os.path.join(base_dir, 'masks', minproj_image.filename))
+
+                    H_orig, W_orig = minproj_image.data8.shape
+                    mask = upsample((np.sum(mask_raw[:, :, :3], axis=2) > 0).astype(np.uint8), H_orig, W_orig)
+
+                    cdb.setMask(image=minproj_image, data=mask.astype("uint8"))
