@@ -70,12 +70,49 @@ def create_database(database_name, pic_path):
     db.getLayer('MaxIndices', base_layer=base, create=True)
 
     # get all images in the folder that match the path
-
     images = glob.glob(pic_path)
+    print(images)
+
+    rep_values = []
+    for image_path in images:
+        fn = os.path.basename(image_path)
+        rep = get_value(fn, "*_rep{rep}_pos*")["rep"]
+        rep_values.append(rep)
+
+    unique_sorted_reps = sorted(set(rep_values))
+    rep_to_index = {rep: i for i, rep in enumerate(unique_sorted_reps)}
+
     # iterate over all images
     for image_path in images:
         image_filename = os.path.basename(image_path)
-        print(image_filename)
+        print("image_filename in prep_clickpoints_databasis: ", image_filename)
+
+        rep = get_value(image_filename, "*_rep{rep}_pos*")["rep"]
+
+        if image_filename.count("MinProj"):
+            layer = "MinProj"
+        elif image_filename.count("MinIndices"):
+            layer = "MinIndices"
+        elif image_filename.count("MaxProj"):
+            layer = "MaxProj"
+        elif image_filename.count("MaxIndices"):
+            layer = "MaxIndices"
+        else:
+            raise ValueError("No known layer!")
+
+        image = db.setImage(filename=image_path, layer=layer)
+
+        # rep is now an int automatically
+        # image.sort_index = rep
+        image.sort_index = rep_to_index[rep]
+
+        image.save()
+
+    db.db.close()
+    """
+    for image_path in images:
+        image_filename = os.path.basename(image_path)
+        print("image_filename in prep_clickpoints_databasis: ", image_filename)
         rep = get_value(image_filename, "*_rep{rep}_pos*")["rep"]
         if image_filename.count("MinProj"):
             # layer = 0
@@ -96,5 +133,4 @@ def create_database(database_name, pic_path):
         image.sort_index = int(rep)
         image.save()
     db.db.close()
-
-
+    """
