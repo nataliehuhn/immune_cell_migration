@@ -88,7 +88,7 @@ def name_glob_files(pattern):
             result.append([file, properties])
     return result
 
-
+"""
 def get_value(string, pattern):
     start, _ = os.path.split(pattern[:pattern.find("{")])
     regex = pattern[:]
@@ -103,7 +103,31 @@ def get_value(string, pattern):
         properties = match.groupdict()
         return properties
     return {}
+"""
+def get_value(string, pattern):
+    start, _ = os.path.split(pattern[:pattern.find("{")])
+    regex = pattern[:]
+    regex = re.sub(r"\*", r"[^\/\\]*", regex)
+    regex = regex.replace("[^\/\\]*[^\/\\]*", ".*")
+    regex = re.sub(r"{([^}]*)}", r"(?P<\1>[^\/\\]*)", regex)
 
+    regex = regex.replace("\\", "\\\\")
+    regex += "$"
+
+    match = re.match(regex, string)
+    if not match:
+        return {}
+
+    properties = match.groupdict()
+
+    # Minimal change: ensure rep is an integer if present
+    if "rep" in properties:
+        try:
+            properties["rep"] = int(properties["rep"])
+        except ValueError:
+            pass
+
+    return properties
 
 
 def norm(img, cap=conf.brightness_max, index_cap=conf.index_max):
