@@ -14,7 +14,7 @@ def track_cells(path_list):
             db = clickpoints.DataFile(str(database_name))
             Frames = db.getImages(layer=1).count()
 
-            db.setMaskType(name='NK', color='#0000ff', index=1)
+            db.setMaskType(name='cell', color='#0000ff', index=1)
 
             run_tracking(path, db, Frames, start_frame=1)
 

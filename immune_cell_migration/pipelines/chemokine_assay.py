@@ -66,7 +66,6 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
             pathlist = name_glob(os.path.join(folder, '*h'))
             print(pathlist)
         # plot kde
-        """
         plot_kde_speed_pers.generate_kde_plot(celltype, path_list=pathlist, conditions=conditions, acquisition_mode=acq_mode, pos_num=pos_num, custom_order=order)
         # plot_kde_differences.generate_kde_plot(celltype, path_list=pathlist, savename=savename, conditions=conditions, acquisition_mode=acq_mode, pos_num=pos_num, custom_order=order, conds_to_compare=conds)
 
@@ -80,7 +79,7 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
 
         # plot quadrants stacked (Q1, Q2)
         plot_quadrants_stacked.plot_quadrant_percentages(parent_folder=folder, custom_order=order)
-        """
+
         # plot directional fraction
         plot_chemokine_assay.plot_fraction_toward_chemokine(celltype=celltype, path_list=pathlist, conditions=conditions, custom_order=order,
             chemokine_direction=chem_dir, acquisition_mode=acq_mode, pos_num=pos_num

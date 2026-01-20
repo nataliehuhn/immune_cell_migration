@@ -14,7 +14,8 @@ from skimage.morphology import remove_small_objects, binary_opening, binary_clos
 from scipy.ndimage import zoom
 
 
-TRAINED_NETWORKS = {"NK": {"trained_file": "best_model_finding.pth", "training_pixelsize": 4.56}}
+TRAINED_NETWORKS = {"NK": {"trained_file": "best_model_finding.pth", "training_pixelsize": 4.56},
+                    "Treg": {"trained_file": "treg_tracking_1.pth", "training_pixelsize": 4.56}}
 
 # ----------------------------
 # Utilities
