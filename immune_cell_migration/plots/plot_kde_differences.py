@@ -7,7 +7,7 @@ import glob
 
 # speed_stepwidth_um_min
 
-MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13}
+MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13, "Treg": 13}
 # if measurement takes images for saved positions: 0, 4, 8, 12, 1, 5, 9, 13: skip
 # if measurement takes images for saved positions:
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}

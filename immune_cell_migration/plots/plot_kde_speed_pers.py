@@ -8,11 +8,11 @@ from matplotlib.lines import Line2D
 
 # speed_stepwidth_um_min
 
-MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13}
+MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13, "Treg": 13}
 # if measurement takes images for saved positions: 0, 4, 8, 12, 1, 5, 9, 13: skip
 # if measurement takes images for saved positions:
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}
-UPPER_LIMIT_KDE = {"NK": 30, "NK_day14": 30, "Jurkat": 15, "pigPBMCs": 25}
+UPPER_LIMIT_KDE = {"NK": 30, "NK_day14": 30, "Jurkat": 15, "pigPBMCs": 25, "Treg": 30}
 
 
 def generate_kde_plot(celltype, path_list, conditions, acquisition_mode, pos_num, custom_order):

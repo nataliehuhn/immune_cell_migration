@@ -15,6 +15,7 @@ from .. plots import plot_kde_differences
 from .. plots import plot_mf_speed_pers
 from .. plots import plot_pf
 from .. plots import plot_quadrants_stacked
+from .. plots import plot_chemokine_assay
 from .. pooling import pool_kde_plots
 from .. pooling import pool_mf_speed_pers
 
@@ -66,7 +67,7 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
             print(pathlist)
         # analyze cdb: set motile fraction definition etc
         motility_filter_cdb.filter_cdb(time_step=time_step, celltype=celltype, path_list=pathlist,
-                                       pixelsize_ccd=4.56, objective=10)  # 4.56 Lumenera, 3.45 Basler
+                                       pixelsize_ccd=3.45, objective=10)  # 4.56 Lumenera, 3.45 Basler
         print("cdb filtering done")
         # extract excel files
         write_to_excel.excel_writer(celltype=celltype, path_list=pathlist, savename=savename, conditions=conditions,

@@ -30,7 +30,7 @@ def get_triplet_flexible(t, spacing, min_rep, max_rep):
     return [t_m, t, t_p]
 
 
-def prepare_unet_input(pathlist, rep_spacing=3, downsampling_factor=3):
+def prepare_unet_input(pathlist, rep_spacing, downsampling_factor):
     """
     Prepares composite TIFFs for UNET training/prediction.
 
@@ -50,6 +50,7 @@ def prepare_unet_input(pathlist, rep_spacing=3, downsampling_factor=3):
         else:
             base_dir = item
 
+        print("making composites for item in pathlist: ", item)
         output_dir = os.path.join(base_dir, "composites")
         os.makedirs(output_dir, exist_ok=True)
 
@@ -85,6 +86,7 @@ def prepare_unet_input(pathlist, rep_spacing=3, downsampling_factor=3):
                 for key, pattern in required_patterns.items():
                     if pattern in fname:
                         file_index[rep][key] = os.path.join(base_dir, fname)
+                        print(file_index[rep][key])
                         break
 
             if len(file_index) == 0:

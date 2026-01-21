@@ -5,7 +5,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13}
+MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13, "Treg": 13}
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}
 CHEMOTACTIC_GRADIENT = {"up": 0, "down": 1, "right": 2, "left": 3}
 

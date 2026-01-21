@@ -6,7 +6,7 @@ import re
 import xlsxwriter
 
 # Configuration dictionaries
-MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13}
+MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13, "Treg": 6.5}
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}
 
 
