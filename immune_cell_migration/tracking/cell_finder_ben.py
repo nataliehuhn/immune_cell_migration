@@ -163,6 +163,9 @@ def predict_cells_unet(pathlist, celltype):
         for f in tqdm(tiff_files, desc=f"Processing {base_dir}"):
             try:
                 img_stack = imread(f).astype(np.float32) / 255.0  # shape (6, H, W)
+                H = img_stack.shape[1]
+                W = img_stack.shape[2]
+
                 img_stack = pad_to_divisible(img_stack)
                 img_tensor = torch.from_numpy(img_stack).unsqueeze(0).to(device)
 
@@ -180,8 +183,6 @@ def predict_cells_unet(pathlist, celltype):
                 mask_img = (np.clip(img_stack[4] * pred_bin, 0, 1) * 255).astype(np.uint8)
 
                 # Make sure extra pixel rows/columns by UNET model are removed again
-                H = img_stack.shape[1]
-                W = img_stack.shape[2]
                 mask_img = mask_img[:H, :W, :]
 
                 mask_out = os.path.join(mask_dir, os.path.basename(f))
