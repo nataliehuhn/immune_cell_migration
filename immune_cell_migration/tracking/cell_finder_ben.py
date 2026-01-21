@@ -183,7 +183,7 @@ def predict_cells_unet(pathlist, celltype):
                 mask_img = (np.clip(img_stack[4] * pred_bin, 0, 1) * 255).astype(np.uint8)
 
                 # Make sure extra pixel rows/columns by UNET model are removed again
-                mask_img = mask_img[:H, :W, :]
+                mask_img = mask_img[:H, :W]
 
                 mask_out = os.path.join(mask_dir, os.path.basename(f))
 
