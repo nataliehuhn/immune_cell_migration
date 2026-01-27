@@ -11,7 +11,7 @@ from .drift_correction import calc_drift
 
 np.set_printoptions(suppress=True)
 
-MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13, "Treg": 6.5}
+MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13, "Treg": 13}
 track_type = 'nk_tracks_greedy_stitched_without_short_high_z'
 thres_speed_umpromin = 20  # Zellen, die oberhalb des Geles (=Medium) schwimmen, ignorieren
 thres_distance_pxl = 20  # 20 bei 15sec&5min

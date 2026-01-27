@@ -201,6 +201,7 @@ def write_masks_to_cdb(pathlist):
         cdb_files = sorted(glob(os.path.join(base_dir, '*.cdb')))
 
         for cdb_file in cdb_files:
+            print("writing masks to cdb for file: ", cdb_file)
             with clickpoints.DataFile(cdb_file) as cdb:
                 minproj_images = [x for x in cdb.getImages() if (x.layer.name == 'MinProj')]
 
