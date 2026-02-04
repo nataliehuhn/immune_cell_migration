@@ -125,7 +125,7 @@ chemokine_assay.complete_pipeline(
 
 **Image Requirements:**
 - TIFF format image sequences
-- Multiple Z-layers (minimum 4 layers)
+- Multiple layers (minimum- and maximum-intensity projections, plus z-information)
 - File naming convention: `{YYYYMMDD}-{HHMMSS}_{rep}_{pos}_{mode}_z*.tif`
 
 **Supported Cameras:**
@@ -208,10 +208,6 @@ Model parameters in `tracking/unet/unet_config.py`:
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
-## Author
-
-Natalie Huhn
 
 ## Citation
 
