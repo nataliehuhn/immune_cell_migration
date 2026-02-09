@@ -8,6 +8,12 @@ import matplotlib.pyplot as plt
 MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13, "Treg": 13}
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}
 CHEMOTACTIC_GRADIENT = {"up": 0, "down": 1, "right": 2, "left": 3}
+CHEMO_VECTORS = {
+    "up":    np.array([0, 1]),
+    "down":  np.array([0, -1]),
+    "right": np.array([1, 0]),
+    "left":  np.array([-1, 0]),
+}
 
 
 def extract_motile_directions(files):
@@ -48,7 +54,41 @@ def extract_motile_directions(files):
 
 
 def compute_fraction_toward(df, chemokine_direction):
-    """Compute fraction of cells moving toward chemokine."""
+    """
+    Compute fraction of cells moving toward chemokine.
+    cos_threshold = 0.5 corresponds to ±60° around gradient direction.
+    """
+    cos_threshold = 0.5
+    if df.empty:
+        return np.nan
+
+    g = CHEMO_VECTORS[chemokine_direction]
+
+    # displacement vectors
+    v = df[["dx", "dy"]].values
+
+    # vector norms
+    v_norm = np.linalg.norm(v, axis=1)
+
+    # avoid division by zero
+    valid = v_norm > 0
+    if not np.any(valid):
+        return np.nan
+
+    v = v[valid]
+    v_norm = v_norm[valid]
+
+    # cosine of angle between displacement and gradient
+    cos_theta = (v @ g) / v_norm  # g is unit length
+
+    toward = cos_theta >= cos_threshold
+
+    return toward.mean()
+
+
+"""
+def compute_fraction_toward(df, chemokine_direction):
+    # Compute fraction of cells moving toward chemokine
 
     if df.empty:
         return np.nan
@@ -70,6 +110,7 @@ def compute_fraction_toward(df, chemokine_direction):
         raise ValueError("Unknown chemokine direction")
 
     return toward.mean()  # fraction
+"""
 
 
 def plot_fraction_toward_chemokine(
@@ -148,17 +189,18 @@ def plot_fraction_toward_chemokine(
         plt.figure(figsize=(0.6 * len(custom_order), 4))
         plt.bar(stats["condition"], stats["mean"], yerr=stats["sem"], capsize=5, edgecolor="black")
         plt.ylim(0, 1)
-        plt.axhline(0.5, linestyle="--", linewidth=1, color="black", alpha=0.7)
+        plt.axhline(0.33, linestyle="--", linewidth=1, color="black", alpha=0.7)
         plt.ylabel("Fraction toward chemokine")
         plt.title(f"Chemokine direction: {chemokine_direction}")
         plt.xticks(rotation=45, ha="right")
 
-        outpath = os.path.join(path, "plot_directional_fraction.png")
+        outpath = os.path.join(path, "plot_directional_fraction_thresh05.png")
         plt.tight_layout()
         plt.savefig(outpath, dpi=300)
         plt.close()
 
         print(f"Saved: {outpath}")
+
 
 """
 example usage

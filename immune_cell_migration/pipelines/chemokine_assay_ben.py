@@ -82,25 +82,26 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
             pathlist = name_glob(os.path.join(folder, '*h'))
             print(pathlist)
         # plot kde
-        plot_kde_speed_pers.generate_kde_plot(celltype, path_list=pathlist, conditions=conditions,
-                                              acquisition_mode=acq_mode, pos_num=pos_num, custom_order=order)
+        # plot_kde_speed_pers.generate_kde_plot(celltype, path_list=pathlist, conditions=conditions,
+        #                                      acquisition_mode=acq_mode, pos_num=pos_num, custom_order=order)
         # plot_kde_differences.generate_kde_plot(celltype, path_list=pathlist, savename=savename, conditions=conditions, acquisition_mode=acq_mode, pos_num=pos_num, custom_order=order, conds_to_compare=conds)
 
         # plot speed, persistence, and motile fraction
-        plot_mf_speed_pers.plot_motile_fractions(parent_folder=folder, custom_order=order)
-        plot_mf_speed_pers.plot_speed(parent_folder=folder, custom_order=order)
-        plot_mf_speed_pers.plot_persistence(parent_folder=folder, custom_order=order)
+        # plot_mf_speed_pers.plot_motile_fractions(parent_folder=folder, custom_order=order)
+        # plot_mf_speed_pers.plot_speed(parent_folder=folder, custom_order=order)
+        # plot_mf_speed_pers.plot_persistence(parent_folder=folder, custom_order=order)
 
         # plot persistence fraction (specifically for elexa, teza experiments)
-        plot_pf.plot_persistent_fraction(parent_folder=folder, custom_order=order)
+        # plot_pf.plot_persistent_fraction(parent_folder=folder, custom_order=order)
 
         # plot quadrants stacked (Q1, Q2)
-        plot_quadrants_stacked.plot_quadrant_percentages(parent_folder=folder, custom_order=order)
+        # plot_quadrants_stacked.plot_quadrant_percentages(parent_folder=folder, custom_order=order)
 
         # plot directional fraction
         plot_chemokine_assay.plot_fraction_toward_chemokine(celltype=celltype, path_list=pathlist, conditions=conditions, custom_order=order,
             chemokine_direction=chem_dir, acquisition_mode=acq_mode, pos_num=pos_num
         )
+
 
 def complete_pooled_pipeline(folders, celltype, acq_mode, pos_num, order, conditions, output_base):
     pool_mf_speed_pers.plot_pooled_motile_fraction(folders=folders, custom_order=order, output_base=output_base)
