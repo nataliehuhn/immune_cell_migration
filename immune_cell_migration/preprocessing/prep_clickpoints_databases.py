@@ -65,47 +65,54 @@ def create_database(database_name, pic_path):
     # Workaround base layer issue
     base = db.getLayer('MinProj', create=True)
     db.getLayer('MinIndices', base_layer=base, create=True)
-
     db.getLayer('MaxProj', base_layer=base, create=True)
     db.getLayer('MaxIndices', base_layer=base, create=True)
 
-    # get all images in the folder that match the path
     images = glob.glob(pic_path)
     print(images)
 
     rep_values = []
+
+    # --------- REP EXTRACTION (supports both formats) ----------
     for image_path in images:
         fn = os.path.basename(image_path)
-        rep = get_value(fn, "*_rep{rep}_pos*")["rep"]
+
+        if fn.startswith("rep"):
+            # format: rep001_...
+            rep = int(fn[3:6])   # assumes zero-padded 3 digits
+        else:
+            # format: *_rep001_pos*
+            rep = int(get_value(fn, "*_rep{rep}_pos*")["rep"])
+
         rep_values.append(rep)
 
     unique_sorted_reps = sorted(set(rep_values))
     rep_to_index = {rep: i for i, rep in enumerate(unique_sorted_reps)}
 
-    # iterate over all images
+    # --------- IMAGE INSERTION ----------
     for image_path in images:
         image_filename = os.path.basename(image_path)
-        print("image_filename in prep_clickpoints_databasis: ", image_filename)
+        print("image_filename in prep_clickpoints_databasis:", image_filename)
 
-        rep = get_value(image_filename, "*_rep{rep}_pos*")["rep"]
+        if image_filename.startswith("rep"):
+            rep = int(image_filename[3:6])
+        else:
+            rep = int(get_value(image_filename, "*_rep{rep}_pos*")["rep"])
 
-        if image_filename.count("MinProj"):
+        if "MinProj" in image_filename:
             layer = "MinProj"
-        elif image_filename.count("MinIndices"):
+        elif "MinIndices" in image_filename:
             layer = "MinIndices"
-        elif image_filename.count("MaxProj"):
+        elif "MaxProj" in image_filename:
             layer = "MaxProj"
-        elif image_filename.count("MaxIndices"):
+        elif "MaxIndices" in image_filename:
             layer = "MaxIndices"
         else:
-            raise ValueError("No known layer!")
+            raise ValueError(f"No known layer in {image_filename}!")
 
         image = db.setImage(filename=image_path, layer=layer)
 
-        # rep is now an int automatically
-        # image.sort_index = rep
         image.sort_index = rep_to_index[rep]
-
         image.save()
 
     db.db.close()

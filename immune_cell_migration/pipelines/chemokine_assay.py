@@ -42,7 +42,7 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
         else:
             pathlist = name_glob(os.path.join(folder, '*h'))
             print(pathlist)
-        cell_tracker.track_cells(celltype, path_list=pathlist, pixelsize_ccd=4.56) #4.56 Lumenera, 3.45 Basler
+        cell_tracker.track_cells(celltype, path_list=pathlist, pixelsize_ccd=3.45) #4.56 Lumenera, 3.45 Basler
 
     if postprocessing:
         if len(name_glob(os.path.join(folder, '*h_corrected'))) != 0:

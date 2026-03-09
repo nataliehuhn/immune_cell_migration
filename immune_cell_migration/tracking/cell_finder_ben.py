@@ -14,8 +14,10 @@ from skimage.morphology import remove_small_objects, binary_opening, binary_clos
 from scipy.ndimage import zoom
 
 
-TRAINED_NETWORKS = {"NK": {"trained_file": "best_model_finding.pth", "training_pixelsize": 4.56},
-                    "Treg": {"trained_file": "best_model_finding_treg.pth", "training_pixelsize": 3.45}}
+TRAINED_NETWORKS = {"NK_old": {"trained_file": "best_model_finding.pth", "training_pixelsize": 4.56},
+                    "Treg": {"trained_file": "best_model_finding_treg.pth", "training_pixelsize": 3.45},
+                    "NK": {"trained_file": "best_model_finding_nk92.pth", "training_pixelsize": 3.45},
+                    "Jurkat": {"trained_file": "best_model_finding_treg.pth", "training_pixelsize": 3.45}}
 
 # ----------------------------
 # Utilities
