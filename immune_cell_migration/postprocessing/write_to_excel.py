@@ -137,10 +137,11 @@ def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, po
                     sheet2.write(1 + i + j, 12,
                                  speedstp_std1[j] if not np.isnan(speedstp_std1[j]) else 0)  # Speed step std
                     sheet2.write(1 + i + j, 13, pf1[j] if not np.isnan(pf1[j]) else 0)
-                    sheet2.write(1 + i + j, 13, pf_std1[j] if not np.isnan(pf_std1[j]) else 0)
+                    sheet2.write(1 + i + j, 14, pf_std1[j] if not np.isnan(pf_std1[j]) else 0)
 
             if acq_sequential:
-                # If positions are dynamically allocated across conditions, distribute them based on number of conditions
+                # If positions are dynamically allocated across conditions, distribute them based on
+                # number of conditions
                 total_positions = pos_num * len(conditions)
                 pos_range = np.arange(total_positions)
                 condition_pos_start = count_cond * pos_num
@@ -164,7 +165,7 @@ def excel_writer(celltype, path_list, savename, conditions, acquisition_mode, po
                     sheet2.write(1 + i + j, 12,
                                  speedstp_std1[j] if not np.isnan(speedstp_std1[j]) else 0)  # Speed step std
                     sheet2.write(1 + i + j, 13, pf1[j] if not np.isnan(pf1[j]) else 0)
-                    sheet2.write(1 + i + j, 13, pf_std1[j] if not np.isnan(pf_std1[j]) else 0)
+                    sheet2.write(1 + i + j, 14, pf_std1[j] if not np.isnan(pf_std1[j]) else 0)
 
                 # Set row format for better visibility
                 sheet2.set_row(i, 16, format1)
