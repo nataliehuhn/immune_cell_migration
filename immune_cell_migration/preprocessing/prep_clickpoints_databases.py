@@ -34,10 +34,13 @@ def prep_clickpoints_databases(path_list):
         # get all image filenames for that measurement
         # image_filenames = nameGlobFiles(os.path.join(path, measurement_date_id+"*_pos{pos}_*_z*.tif"))
         image_filenames = name_glob_files(os.path.join(p, measurement_date_id + "*_pos{pos}_*_mode{mode}_z*.tif"))
+        print(image_filenames)
 
         # extract all unique position identifiers e.g. 000, 001, ...
         positions = np.unique([extra["pos"] for filename, extra in image_filenames])
+        print(positions)
         modes = np.unique([extra["mode"] for filename, extra in image_filenames])
+        print(modes)
 
         # modes = ['POL']
         for pos in positions:
