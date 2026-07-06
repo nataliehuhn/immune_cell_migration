@@ -66,7 +66,7 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
             print(pathlist)
         # analyze cdb: set motile fraction definition etc
         motility_filter_cdb.filter_cdb(time_step=time_step, celltype=celltype, path_list=pathlist,
-                                       pixelsize_ccd=3.45, objective=10)  # 4.56 Lumenera, 3.45 Basler
+                                       pixelsize_ccd=3.45, objective=10)  # 4.56 Lumenera, 3.45 Basler, objective for mouse_t_cells =20
         print("cdb filtering done")
         # extract excel files
         write_to_excel.excel_writer(celltype=celltype, path_list=pathlist, savename=savename, conditions=conditions,
@@ -81,8 +81,8 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
             pathlist = name_glob(os.path.join(folder, '*h'))
             print(pathlist)
         # plot kde
-        # plot_kde_speed_pers.generate_kde_plot(celltype, path_list=pathlist, conditions=conditions,
-        #                                      acquisition_mode=acq_mode, pos_num=pos_num, custom_order=order)
+        plot_kde_speed_pers.generate_kde_plot(celltype, path_list=pathlist, conditions=conditions,
+                                              acquisition_mode=acq_mode, pos_num=pos_num, custom_order=order)
         # plot_kde_differences.generate_kde_plot(celltype, path_list=pathlist, savename=savename, conditions=conditions, acquisition_mode=acq_mode, pos_num=pos_num, custom_order=order, conds_to_compare=conds)
 
         # plot speed, persistence, and motile fraction
