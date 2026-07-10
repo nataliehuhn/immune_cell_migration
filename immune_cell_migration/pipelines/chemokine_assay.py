@@ -18,18 +18,34 @@ from .. pooling import pool_kde_plots
 from .. pooling import pool_mf_speed_pers
 
 
+def _is_position_corrected(outfolder, pos):
+    return os.path.exists(os.path.join(outfolder, f"drift_pos{pos:02d}.pkl"))
+
+
 def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode, savename, order, conds, chem_dir, drift_corr=True, clickpoints_db=True, tracking=True, postprocessing=True, plotting=True, n_jobs=1):
     if drift_corr:
         pathlist = name_glob(os.path.join(folder, '*h'))
         print(pathlist)
         for path, _ in pathlist:
             num_pos = len(conditions) * pos_num
-            print(num_pos)
             positions = np.arange(0, num_pos, 1)
             long_measurements = False
             outfolder = path + '_corrected'
-            print(outfolder)
-            Parallel(n_jobs=n_jobs)(delayed(correct_drift)(path, pos, outfolder, long_measurements) for pos in positions)
+
+            remaining_positions = [
+                pos for pos in positions
+                if not _is_position_corrected(outfolder, pos)
+            ]
+
+            if not remaining_positions:
+                print(f"All positions already corrected, skipping: {outfolder}")
+                continue
+
+            print(f"Correcting {len(remaining_positions)}/{len(positions)} remaining positions in: {outfolder}")
+            Parallel(n_jobs=n_jobs)(
+                delayed(correct_drift)(path, pos, outfolder, long_measurements)
+                for pos in remaining_positions
+            )
 
     if clickpoints_db:
         pathlist = name_glob(os.path.join(folder, '*h_corrected'))
