@@ -124,6 +124,10 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.conda/
+.conda-pkgs/
+.conda-cache/
+.matplotlib-cache/
 env/
 venv/
 ENV/
