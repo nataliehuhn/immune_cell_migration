@@ -1,9 +1,15 @@
 import os
+import re
 import glob
+from collections import defaultdict
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+
+from ..preprocessing import borders as border_utils
+from . import _axis_distribution
 
 MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13, "Treg": 13}
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}
@@ -53,16 +59,27 @@ def extract_motile_directions(files):
     return pd.concat(all_entries, ignore_index=True)
 
 
-def compute_fraction_toward(df, chemokine_direction):
+def compute_fraction_toward(df, chemokine_direction, gradient_vector=None):
     """
     Compute fraction of cells moving toward chemokine.
     cos_threshold = 0.5 corresponds to ±60° around gradient direction.
+
+    If ``gradient_vector`` is given (a 2D vector, typically the perpendicular to
+    the drawn border lines) it is used instead of the fixed cardinal
+    ``CHEMO_VECTORS[chemokine_direction]`` lookup.
     """
     cos_threshold = 0.5
     if df.empty:
         return np.nan
 
-    g = CHEMO_VECTORS[chemokine_direction]
+    if gradient_vector is not None:
+        g = np.asarray(gradient_vector, dtype=float)
+        n = np.linalg.norm(g)
+        if n == 0:
+            return np.nan
+        g = g / n  # ensure unit length
+    else:
+        g = CHEMO_VECTORS[chemokine_direction]
 
     # displacement vectors
     v = df[["dx", "dy"]].values
@@ -84,6 +101,45 @@ def compute_fraction_toward(df, chemokine_direction):
     toward = cos_theta >= cos_threshold
 
     return toward.mean()
+
+
+def compute_direction_metrics(df, axis, cos_threshold=0.5):
+    """
+    Project motile-cell displacements onto ``axis`` and return three numbers:
+
+        (index, frac_pos, frac_neg)
+
+    * ``index``    - mean signed cosine of the displacement vs ``axis``
+                     (a chemotaxis index; >0 = net bias along +axis).
+    * ``frac_pos`` - fraction of cells within +/-60 deg of +axis.
+    * ``frac_neg`` - fraction of cells within +/-60 deg of -axis.
+
+    ``axis`` is the border-perpendicular vector (oriented left border -> right
+    border) when borders exist, otherwise the fixed ``CHEMO_VECTORS`` direction.
+    """
+    nan3 = (np.nan, np.nan, np.nan)
+    if df.empty:
+        return nan3
+
+    g = np.asarray(axis, dtype=float)
+    n = np.linalg.norm(g)
+    if n == 0:
+        return nan3
+    g = g / n
+
+    v = df[["dx", "dy"]].values
+    v_norm = np.linalg.norm(v, axis=1)
+    valid = v_norm > 0
+    if not np.any(valid):
+        return nan3
+    v = v[valid]
+    v_norm = v_norm[valid]
+
+    cos_theta = (v @ g) / v_norm
+    index = float(np.mean(cos_theta))
+    frac_pos = float(np.mean(cos_theta >= cos_threshold))
+    frac_neg = float(np.mean(cos_theta <= -cos_threshold))
+    return index, frac_pos, frac_neg
 
 
 """
@@ -129,6 +185,23 @@ def plot_fraction_toward_chemokine(
     for path, _ in path_list:
         print(f"Processing path: {path}")
 
+        # Cache of per-position (axis, has_borders). When border lines are drawn
+        # in the position's 0h_corrected database, the axis is perpendicular to
+        # them, oriented left border -> right border (direction-agnostic: +axis =
+        # toward the right border). When no borders exist we fall back to the
+        # explicit cardinal chemokine_direction so the plot still works.
+        axis_by_pos = {}
+
+        def axis_for_pos(pos):
+            if pos not in axis_by_pos:
+                ref_cdb = border_utils.reference_cdb_for_pos(path, pos)
+                borders = border_utils.load_borders_from_path(ref_cdb)
+                if borders is None:
+                    axis_by_pos[pos] = (CHEMO_VECTORS[chemokine_direction], False)
+                else:
+                    axis_by_pos[pos] = (border_utils.perpendicular_vector(borders, hint=None), True)
+            return axis_by_pos[pos]
+
         cond_sets = [[d] for d in conditions]
         num_conditions = len(conditions)
 
@@ -153,8 +226,9 @@ def plot_fraction_toward_chemokine(
 
             count_cond += 1
 
-        # Compute fraction toward chemokine per condition & per position
+        # Compute directional metrics per condition & per position
         plot_data = []
+        any_borders = False
 
         for cond_idx, condition_name in enumerate(conditions):
             files = condition_files[cond_idx]
@@ -168,12 +242,16 @@ def plot_fraction_toward_chemokine(
             for pos in positions:
                 files_pos = [f for f in files if int(f.split("_")[-4][3:]) == pos]
                 df_dir = extract_motile_directions(files_pos)
-                fraction = compute_fraction_toward(df_dir, chemokine_direction)
+                axis, has_borders = axis_for_pos(pos)
+                any_borders = any_borders or has_borders
+                index, frac_right, frac_left = compute_direction_metrics(df_dir, axis)
 
                 plot_data.append({
                     "condition": condition_name,
                     "position": pos,
-                    "fraction": fraction
+                    "index": index,
+                    "frac_right": frac_right,
+                    "frac_left": frac_left,
                 })
 
         df_plot = pd.DataFrame(plot_data)
@@ -182,24 +260,161 @@ def plot_fraction_toward_chemokine(
         df_plot["condition"] = pd.Categorical(df_plot["condition"], categories=custom_order, ordered=True)
         df_plot = df_plot.sort_values("condition")
 
-        # Statistics per condition
-        stats = df_plot.groupby("condition")["fraction"].agg(["mean", "sem"]).reset_index()
+        # Persist the per-position values alongside the plots
+        df_plot.to_csv(os.path.join(path, "directional_metrics.csv"), index=False)
 
-        # Barplot
-        plt.figure(figsize=(0.6 * len(custom_order), 4))
-        plt.bar(stats["condition"], stats["mean"], yerr=stats["sem"], capsize=5, edgecolor="black")
-        plt.ylim(0, 1)
-        plt.axhline(0.33, linestyle="--", linewidth=1, color="black", alpha=0.7)
-        plt.ylabel("Fraction toward chemokine")
-        plt.title(f"Chemokine direction: {chemokine_direction}")
-        plt.xticks(rotation=45, ha="right")
+        # Statistics per condition (mean +/- sem across positions)
+        stats = df_plot.groupby("condition").agg(
+            index_mean=("index", "mean"), index_sem=("index", "sem"),
+            right_mean=("frac_right", "mean"), right_sem=("frac_right", "sem"),
+            left_mean=("frac_left", "mean"), left_sem=("frac_left", "sem"),
+        ).reset_index()
 
-        outpath = os.path.join(path, "plot_directional_fraction_thresh05.png")
+        # "+axis" is toward the right border when borders were used, otherwise the
+        # explicit cardinal chemokine direction.
+        pos_label = "right border" if any_borders else f"{chemokine_direction}"
+        neg_label = "left border" if any_borders else "opposite"
+        axis_desc = "perpendicular to borders" if any_borders else f"cardinal {chemokine_direction}"
+
+        conds = stats["condition"].astype(str).tolist()
+        x = np.arange(len(conds))
+
+        fig, (ax1, ax2) = plt.subplots(
+            1, 2, figsize=(max(1.2 * len(conds), 6), 4.2)
+        )
+
+        # (1) signed chemotaxis index
+        ax1.bar(x, stats["index_mean"], yerr=stats["index_sem"], capsize=5, edgecolor="black")
+        ax1.axhline(0.0, linestyle="-", linewidth=0.8, color="black")
+        ax1.set_ylim(-1, 1)
+        ax1.set_ylabel(f"Chemotaxis index\n(+ = toward {pos_label})")
+        ax1.set_title(f"Signed index ({axis_desc})")
+        ax1.set_xticks(x)
+        ax1.set_xticklabels(conds, rotation=45, ha="right")
+
+        # (2) fraction toward each border (grouped bars)
+        w = 0.4
+        ax2.bar(x - w / 2, stats["right_mean"], width=w, yerr=stats["right_sem"],
+                capsize=4, edgecolor="black", label=f"toward {pos_label}")
+        ax2.bar(x + w / 2, stats["left_mean"], width=w, yerr=stats["left_sem"],
+                capsize=4, edgecolor="black", label=f"toward {neg_label}")
+        ax2.set_ylim(0, 1)
+        ax2.axhline(0.33, linestyle="--", linewidth=1, color="black", alpha=0.7)
+        ax2.set_ylabel("Fraction of motile cells (+/-60 deg)")
+        ax2.set_title("Fraction toward each border")
+        ax2.set_xticks(x)
+        ax2.set_xticklabels(conds, rotation=45, ha="right")
+        ax2.legend(fontsize=8)
+
+        outpath = os.path.join(path, "plot_directional_thresh05.png")
         plt.tight_layout()
         plt.savefig(outpath, dpi=300)
         plt.close()
 
         print(f"Saved: {outpath}")
+
+
+def _hour_key(h):
+    m = re.match(r"(\d+)", str(h))
+    return int(m.group(1)) if m else 0
+
+
+def plot_cell_distribution_along_axis(
+    celltype,
+    path_list,
+    conditions,
+    custom_order,
+    acquisition_mode,
+    pos_num,
+    n_bins=20,
+    motile_only=False,
+):
+    """
+    Spatial distribution of cells along the chemokine axis over time.
+
+    For every timepoint folder in ``path_list`` each cell is projected onto the
+    left->right (perpendicular-to-borders) axis and normalized to u in [0, 1]
+    (0 = left border, 1 = right border). Per condition we plot how that
+    distribution changes across the hours - a shift of mass toward one border
+    over time indicates a directional (chemotactic) response.
+
+    One figure per condition is written to the parent data folder: an overlay of
+    per-hour histograms plus a hour x position heatmap. Pooled counts are saved
+    to ``cell_distribution_along_axis.csv``.
+    """
+    thresh_motile = MOTILITY_DEFINITION[celltype]
+    acq_sequential = ACQUISITION_MODE[acquisition_mode]
+    num_conditions = len(conditions)
+
+    # (condition, hour) -> list of normalized positions u
+    collected = defaultdict(list)
+    hours = set()
+
+    for path, _ in path_list:
+        hour = os.path.basename(os.path.normpath(path)).split("_")[0]  # e.g. '3h'
+        hours.add(hour)
+        border_cache = {}
+
+        for f in glob.glob(os.path.join(path, "*" + str(thresh_motile) + "umin*.csv")):
+            pos = int(f.split("_")[-4][3:])
+            cond_idx = pos // pos_num if acq_sequential else pos % num_conditions
+            if cond_idx >= num_conditions:
+                continue
+            condition = conditions[cond_idx]
+
+            if pos not in border_cache:
+                ref = border_utils.reference_cdb_for_pos(path, pos)
+                border_cache[pos] = border_utils.load_borders_from_path(ref)
+            borders = border_cache[pos]
+            if borders is None:
+                continue
+
+            df = pd.read_csv(f, index_col=0)
+            if not {"id", "x", "y"}.issubset(df.columns):
+                continue
+            if motile_only and "motile" in df.columns:
+                df = df[df["motile"] == True]
+            if df.empty:
+                continue
+
+            # one point per cell (mean track position)
+            g = df.groupby("id").agg(x=("x", "mean"), y=("y", "mean"))
+            u = border_utils.normalized_position(borders, g["x"].values, g["y"].values)
+            u = u[np.isfinite(u)]
+            u = u[(u >= 0.0) & (u <= 1.0)]
+            collected[(condition, hour)].extend(u.tolist())
+
+    if not collected:
+        print("plot_cell_distribution_along_axis: no data collected")
+        return
+
+    hours = sorted(hours, key=_hour_key)
+    out_dir = os.path.dirname(os.path.normpath(path_list[0][0]))
+    order = [c for c in custom_order if any((c, h) in collected for h in hours)]
+
+    # remap (condition, hour_label) -> (condition, hour_index) for the renderer
+    collected_idx = defaultdict(list)
+    for (condition, hour), vals in collected.items():
+        collected_idx[(condition, hours.index(hour))].extend(vals)
+
+    _axis_distribution.render_distribution(
+        collected_idx, order, labels=hours, out_dir=out_dir,
+        prefix="cell_distribution_along_axis", n_bins=n_bins, time_title="hour",
+    )
+
+    # tidy per-bin counts for downstream stats
+    bins = np.linspace(0.0, 1.0, n_bins + 1)
+    centers = 0.5 * (bins[:-1] + bins[1:])
+    rows = []
+    for condition in order:
+        for hour in hours:
+            h_counts, _ = np.histogram(np.asarray(collected.get((condition, hour), [])), bins=bins)
+            for bi in range(n_bins):
+                rows.append({"condition": condition, "hour": hour,
+                             "u_center": centers[bi], "n_cells": int(h_counts[bi])})
+    pd.DataFrame(rows).to_csv(
+        os.path.join(out_dir, "cell_distribution_along_axis.csv"), index=False
+    )
 
 
 """

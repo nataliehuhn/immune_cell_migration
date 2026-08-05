@@ -198,19 +198,46 @@ def predict_cells_unet(pathlist, celltype):
 
 
 def write_masks_to_cdb(pathlist):
+    # Imported lazily to avoid a circular import (utils -> tracking -> cell_finder
+    # would otherwise pull in the preprocessing package before utils is ready).
+    from ..preprocessing import borders as border_utils
+
     for item in pathlist:
         base_dir = item[0]
         cdb_files = sorted(glob(os.path.join(base_dir, '*.cdb')))
 
         for cdb_file in cdb_files:
             print("writing masks to cdb for file: ", cdb_file)
+
+            # Border lines are drawn only in the 0h_corrected database of each
+            # position. Look them up so detections outside the channel (walls,
+            # debris) get clipped away. If none are found we keep the full frame.
+            ref_path = border_utils.find_reference_cdb(cdb_file)
+            if ref_path is not None and os.path.abspath(ref_path) != os.path.abspath(cdb_file):
+                borders = border_utils.load_borders_from_path(ref_path)
+            else:
+                borders = None  # this cdb is (or has no) reference; read it below
+
             with clickpoints.DataFile(cdb_file) as cdb:
+                if borders is None:
+                    borders = border_utils.read_borders(cdb)
+                if borders is None:
+                    print(f"  no border lines found for {os.path.basename(cdb_file)} "
+                          f"(ref: {ref_path}); keeping full frame")
+
                 minproj_images = [x for x in cdb.getImages() if (x.layer.name == 'MinProj')]
+                region_cache = {}
 
                 for minproj_image in minproj_images:
                     mask_raw = plt.imread(os.path.join(base_dir, 'masks', minproj_image.filename))
 
                     H_orig, W_orig = minproj_image.data8.shape
                     mask = upsample((np.sum(mask_raw[:, :, :3], axis=2) > 0).astype(np.uint8), H_orig, W_orig)
+
+                    if borders is not None:
+                        key = (H_orig, W_orig)
+                        if key not in region_cache:
+                            region_cache[key] = border_utils.region_mask((H_orig, W_orig), borders)
+                        mask = mask * region_cache[key]  # clip to between-borders region
 
                     cdb.setMask(image=minproj_image, data=mask.astype("uint8"))
