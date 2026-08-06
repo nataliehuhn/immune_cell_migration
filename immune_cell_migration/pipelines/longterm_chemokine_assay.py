@@ -24,7 +24,7 @@ import numpy as np
 from joblib import Parallel, delayed
 
 from ..utils import name_glob
-from ..preprocessing import correct_drift
+from ..preprocessing import correct_drift_longterm
 from ..preprocessing import prep_clickpoints_databases
 from ..preprocessing import prep_6layer_tiffs_for_detection_ben
 from ..preprocessing import borders as border_utils
@@ -43,7 +43,7 @@ def _is_position_corrected(outfolder, pos):
 def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode, savename,
                       order, chem_dir, rep_spacing, downsampling_factor,
                       bin_minutes=60, pixelsize_ccd=3.45, objective=10,
-                      long_measurements=True,
+                      drift_subsample=10,
                       drift_corr=True, clickpoints_db=True, detection=True, tracking=True,
                       postprocessing=True, plotting=True, n_jobs=1, require_borders=False):
     """
@@ -53,7 +53,8 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
         time_step         : seconds between consecutive frames (e.g. 60).
         bin_minutes       : width of each time bin for the over-time plots (60 = hourly).
         pixelsize_ccd     : camera pixel size (3.45 Basler, 4.56 Lumenera).
-        long_measurements : passed to correct_drift (True for long timelapses).
+        drift_subsample   : estimate drift on every Nth frame, then interpolate to
+                            all frames (memory-safe streaming; see correct_drift_longterm).
         require_borders   : if True, stop before detection until borders are drawn
                             in every position database (run the same call twice).
     """
@@ -66,7 +67,7 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
         if remaining:
             print(f"Correcting {len(remaining)}/{len(positions)} positions in: {corrected}")
             Parallel(n_jobs=n_jobs)(
-                delayed(correct_drift)(folder, pos, corrected, long_measurements)
+                delayed(correct_drift_longterm)(folder, pos, corrected, drift_subsample)
                 for pos in remaining
             )
         else:

@@ -73,6 +73,20 @@ def find_reference_cdb(cdb_path, reference_folder_name=REFERENCE_FOLDER_NAME):
     return reference_cdb_for_pos(cdb_path, pos, reference_folder_name)
 
 
+# Marker-type names accepted for border lines (case-insensitive substring match).
+# Includes the common "boarder" typo and the correct "border" spelling.
+BORDER_TYPE_KEYS = ("border", "boarder")
+
+
+def _is_border_line(line):
+    """True if the line's marker type looks like a border (by name)."""
+    try:
+        name = (line.type.name or "").lower()
+    except Exception:
+        return False
+    return any(key in name for key in BORDER_TYPE_KEYS)
+
+
 def read_borders(cdb):
     """Read the two border lines from an open clickpoints database.
 
@@ -80,11 +94,21 @@ def read_borders(cdb):
     ordered by ascending mean-x (so ``left`` is the left border). Returns
     ``None`` if fewer than two lines are present. If more than two lines exist
     the two outermost (smallest and largest mean-x) are used.
+
+    Lines drawn with a marker type named like a border ("border"/"boarder",
+    any case) are preferred; if at least two such lines exist only they are used.
+    Otherwise every line marker in the database is considered (so an unnamed or
+    differently-named line type still works).
     """
     lines = cdb.getLines()
     if lines is None or len(lines) < 2:
         return None
-    segs = [(float(l.x1), float(l.y1), float(l.x2), float(l.y2)) for l in lines]
+    lines = list(lines)
+    border_lines = [l for l in lines if _is_border_line(l)]
+    use = border_lines if len(border_lines) >= 2 else lines
+    if len(use) < 2:
+        return None
+    segs = [(float(l.x1), float(l.y1), float(l.x2), float(l.y2)) for l in use]
     segs.sort(key=lambda s: 0.5 * (s[0] + s[2]))
     if len(segs) > 2:
         segs = [segs[0], segs[-1]]
