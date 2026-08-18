@@ -17,6 +17,7 @@ from .. plots import plot_mf_speed_pers
 from .. plots import plot_pf
 from .. plots import plot_quadrants_stacked
 from .. plots import plot_chemokine_assay
+from .. plots import chemotaxis_metrics
 from .. pooling import pool_kde_plots
 from .. pooling import pool_mf_speed_pers
 
@@ -27,7 +28,7 @@ def _is_position_corrected(outfolder, pos):
 
 def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode, savename, order, conds, chem_dir,
                       rep_spacing, downsampling_factor, drift_corr=True, clickpoints_db=True, detection=True, tracking=True, postprocessing=True, plotting=True, n_jobs=1,
-                      require_borders=False):
+                      require_borders=False, extra_plots=()):
     if drift_corr:
         pathlist = name_glob(os.path.join(folder, '*h'))
         print(pathlist)
@@ -81,7 +82,7 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
         else:
             pathlist = name_glob(os.path.join(folder, '*h'))
             print(pathlist)
-        cell_finder_ben.predict_cells_unet(pathlist, celltype)
+        cell_finder_ben.predict_cells_unet(pathlist, celltype, n_jobs=n_jobs)
         cell_finder_ben.write_masks_to_cdb(pathlist)
 
     if tracking:
@@ -91,7 +92,7 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
         else:
             pathlist = name_glob(os.path.join(folder, '*h'))
             print(pathlist)
-        cell_tracker_ben.track_cells(pathlist)
+        cell_tracker_ben.track_cells(pathlist, n_jobs=n_jobs)
 
     if postprocessing:
         if len(name_glob(os.path.join(folder, '*h_corrected'))) != 0:
@@ -102,7 +103,8 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
             print(pathlist)
         # analyze cdb: set motile fraction definition etc
         motility_filter_cdb.filter_cdb(time_step=time_step, celltype=celltype, path_list=pathlist,
-                                       pixelsize_ccd=3.45, objective=10)  # 4.56 Lumenera, 3.45 Basler
+                                       pixelsize_ccd=3.45, objective=10,  # 4.56 Lumenera, 3.45 Basler
+                                       colorize_direction=True, chemokine_direction=chem_dir)
         print("cdb filtering done")
         # extract excel files
         write_to_excel.excel_writer(celltype=celltype, path_list=pathlist, savename=savename, conditions=conditions,
@@ -137,10 +139,27 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
             chemokine_direction=chem_dir, acquisition_mode=acq_mode, pos_num=pos_num
         )
 
-        # spatial distribution of cells along the chemokine axis over the hours
-        plot_chemokine_assay.plot_cell_distribution_along_axis(celltype=celltype, path_list=pathlist, conditions=conditions, custom_order=order,
-            acquisition_mode=acq_mode, pos_num=pos_num
-        )
+        # ---- optional extra analyses, selected via `extra_plots` ----
+        extras = set(extra_plots or ())
+        ekw = dict(celltype=celltype, path_list=pathlist, conditions=conditions, custom_order=order,
+                   acquisition_mode=acq_mode, pos_num=pos_num, time_step=time_step, pixelsize_ccd=3.45)
+        if "distribution" in extras:   # cell distribution along the axis over the hours
+            plot_chemokine_assay.plot_cell_distribution_along_axis(celltype=celltype, path_list=pathlist,
+                conditions=conditions, custom_order=order, acquisition_mode=acq_mode, pos_num=pos_num)
+        if "half" in extras:           # directionality split into left/right channel half
+            plot_chemokine_assay.plot_directional_by_half(celltype=celltype, path_list=pathlist,
+                conditions=conditions, custom_order=order, chemokine_direction=chem_dir,
+                acquisition_mode=acq_mode, pos_num=pos_num)
+        if "fmi" in extras:
+            chemotaxis_metrics.plot_fmi(**ekw)
+        if "speed" in extras:
+            chemotaxis_metrics.plot_speed_gradient(**ekw)
+        if "rose" in extras:
+            chemotaxis_metrics.plot_rose_over_time(**ekw)
+        if "map" in extras:
+            chemotaxis_metrics.plot_chemotaxis_map(**ekw)
+        if "exits" in extras:
+            chemotaxis_metrics.plot_border_exits(**ekw)
 
 
 def complete_pooled_pipeline(folders, celltype, acq_mode, pos_num, order, conditions, output_base):

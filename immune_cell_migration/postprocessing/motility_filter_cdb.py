@@ -17,7 +17,17 @@ thres_speed_umpromin = 20  # Zellen, die oberhalb des Geles (=Medium) schwimmen,
 thres_distance_pxl = 20  # 20 bei 15sec&5min
 
 
-def filter_cdb(celltype, time_step, path_list, pixelsize_ccd, objective=10): #pixelsize 3.45 or 4.56
+def filter_cdb(celltype, time_step, path_list, pixelsize_ccd, objective=10, motility_window_min=None,
+               colorize_direction=False, chemokine_direction=None,
+               toward_fraction=0.5, color_per_frame=True, color_window_min=15.0): #pixelsize 3.45 or 4.56
+    """
+    ``motility_window_min``: if given (e.g. 5.5), a cell counts as motile when it
+    moves >= the threshold within *any* sliding window of that many minutes,
+    instead of over the whole track. Needed for long acquisitions where a static
+    cell would otherwise accumulate enough jitter over hours to be called motile.
+    For the short ~5.5-min movies a 5.5-min window equals the whole track, so the
+    result is unchanged. ``None`` keeps the original whole-track behavior.
+    """
     thresh_motile = MOTILITY_DEFINITION[celltype]
     res = pixelsize_ccd/objective  # Lumenera ; 6.45/10  Hamamatsu
     save_name_csv = '_' + str(thresh_motile) + 'umin5min'
@@ -34,12 +44,36 @@ def filter_cdb(celltype, time_step, path_list, pixelsize_ccd, objective=10): #pi
             # load database
             db = clickpoints.DataFile(path)
             # get number of frames
-            database_to_pandas(db, time_step, res, celltype)
+            database_to_pandas(db, time_step, res, celltype, motility_window_min=motility_window_min,
+                               colorize_direction=colorize_direction, chemokine_direction=chemokine_direction,
+                               toward_fraction=toward_fraction, color_per_frame=color_per_frame,
+                               color_window_min=color_window_min)
 
 
 def get_track_distance(nanpadded_trackarray):
     # calculate euclidean distance sqrt(( x max - x min)^2 + (y max - y min)^2)
     return np.linalg.norm(np.nanmax(nanpadded_trackarray, axis=1) - np.nanmin(nanpadded_trackarray, axis=1), axis=1)
+
+
+def windowed_max_displacement(track_xy, window):
+    """Max bounding-box displacement (pixels) over any sliding window of ``window``
+    frames within a single track. ``track_xy`` is a (frames, 2) array that may
+    contain nans for missing frames."""
+    n = len(track_xy)
+    if window >= n:
+        seg = track_xy[~np.isnan(track_xy[:, 0])]
+        if len(seg) < 2:
+            return 0.0
+        return float(np.linalg.norm(seg.max(axis=0) - seg.min(axis=0)))
+    best = 0.0
+    for s in range(0, n - 1):
+        seg = track_xy[s:s + window]
+        seg = seg[~np.isnan(seg[:, 0])]
+        if len(seg) >= 2:
+            d = float(np.linalg.norm(seg.max(axis=0) - seg.min(axis=0)))
+            if d > best:
+                best = d
+    return best
 
 
 def get_speed_boundingbox(nanpadded_trackarray, res, time_step):
@@ -106,19 +140,18 @@ def measure_tracks(nanpadded_trackarray, time_step, res):
     return track_distance_in_pxl, speed_boundingbox_um_min, speed_stepwidth_um_min, cos_angle
 
 
-def extract(db, data, time_step, res):
+def extract(db, data, time_step, res, window_frames=None):
     frames = db.getImages(layer=1).count()
-    # get the nan padded track over time array - get a list with all positions of the marker 'PT_Track_marker'
-    nanpadded_trackarray = get_tracks_nan_padded(db, type=track_type, layer=1)
 
-    drift = calc_drift(frames, nanpadded_trackarray, 5)
-    # print(drift)
-
-    for i, d in enumerate(drift):
-        # print(i)
-        # print(d)
-        im = db.getImage(frame=i, layer=1)  #layer=1
-        db.setOffset(im, -d[0], -d[1])
+    # The images are ALREADY drift-corrected in preprocessing (pixels are shifted in
+    # correct_drift / correct_drift_longterm). We must therefore NOT re-apply a
+    # track-derived drift as per-image offsets: doing so reintroduces visible drift
+    # in the cdb, accumulates over long movies (cumsum) so frames slide out of view
+    # and only one seems to show, and detaches the tracks from the image. Instead we
+    # clear any offsets left from a previous run, so the cdb shows the corrected
+    # images as-is with the tracks sitting on their cells (re-runnable).
+    for im in db.getImages():
+        db.setOffset(im, 0, 0)
 
     def adjust_length(array, index):
         return array[~np.isnan(nptrack[index, 1:, 0])]
@@ -134,6 +167,10 @@ def extract(db, data, time_step, res):
 
         data.loc[data.id == id, "distance_um"] = track_distance_in_pxl[0] * res
         data.loc[data.id == id, "speed_boundingbox_um_min"] = speed_boundingbox_um_min[0]
+        if window_frames:
+            # max displacement within any sliding window (for long-movie motility)
+            data.loc[data.id == id, "window_distance_um"] = \
+                windowed_max_displacement(nptrack[0], window_frames) * res
         try:
             data.loc[data.id == id, "speed_stepwidth_um_min"] = adjust_length(speed_stepwidth_um_min[0], 0)
         except ValueError:
@@ -268,9 +305,17 @@ def fix_database(db, track_type):
     db.setTracksNanPadded(nan_padded[:, :-1, :], track_type=track_type, start_frame=1)
 
 
-def database_to_pandas(db, time_step, res, celltype):
+def database_to_pandas(db, time_step, res, celltype, motility_window_min=None,
+                       colorize_direction=False, chemokine_direction=None,
+                       toward_fraction=0.5, color_per_frame=True, color_window_min=15.0):
     thresh_motile = MOTILITY_DEFINITION[celltype]
     save_name_csv = '_' + str(thresh_motile) + 'umin5min'
+    # translate the motility window (minutes) into frames for this movie
+    window_frames = None
+    if motility_window_min:
+        window_frames = max(2, int(round(motility_window_min * 60.0 / time_step)))
+        print(f"motility window: {motility_window_min} min -> {window_frames} frames "
+              f"(time_step={time_step}s)")
     data = []
     # get the mask type so we can filter just for the NK mask
     mask_type = db.getMaskType(name="NK") #NK
@@ -326,7 +371,7 @@ def database_to_pandas(db, time_step, res, celltype):
     # convert the data list to a DataFrame
     data = pd.DataFrame(data, columns=["frame", "id", "x", "y", "z", "area", "eccentricity"])
     # print(data['y'])
-    extract(db, data, time_step, res)
+    extract(db, data, time_step, res, window_frames=window_frames)
 
     # drift = calc_drift(data, )
     # print(data['y'])
@@ -337,12 +382,35 @@ def database_to_pandas(db, time_step, res, celltype):
 
     data = data[data["speed_boundingbox_um_min"] < thres_speed_umpromin]
 
-    data["motile"] = data["distance_um"] > thresh_motile
+    # motile = moved beyond the threshold. For long movies use the max displacement
+    # within any sliding window (so a jittery static cell isn't called motile just
+    # from accumulating drift over hours); otherwise use the whole-track distance.
+    if window_frames:
+        data["motile"] = data["window_distance_um"] > thresh_motile
+    else:
+        data["motile"] = data["distance_um"] > thresh_motile
     print(np.mean(data.groupby("id").motile.mean()))
     # save the dataframe
     data.to_csv(db._database_filename[:-4] + save_name_csv +".csv")
-    #colorize motile tracks
-    colorize_tracks(db, data)
+    # colorize tracks: by migration direction vs the chemokine axis if requested and
+    # borders are available, otherwise the plain motile/non-motile coloring.
+    colored = False
+    if colorize_direction:
+        from ..preprocessing import borders as border_utils   # lazy: avoid import cycle
+        ref = border_utils.find_reference_cdb(db._database_filename)
+        borders = border_utils.load_borders_from_path(ref)
+        if borders is not None:
+            axis = border_utils.perpendicular_vector(borders, hint=chemokine_direction)
+            axis = axis / (np.linalg.norm(axis) or 1.0)
+            # colour on the LONG (e.g. 30-min) window, not the short motility window:
+            # small direction changes must not flip the colour, but a cell that heads
+            # toward the chemokine for 30 min and then away for 30 min gets 2 colours.
+            color_frames = max(2, int(round(color_window_min * 60.0 / time_step)))
+            colorize_tracks_by_direction(db, data, axis, window_frames=color_frames,
+                                         toward_fraction=toward_fraction, per_frame=color_per_frame)
+            colored = True
+    if not colored:
+        colorize_tracks(db, data)
     return data
 
 #--------------------------------------------------- TEST 22.10.2024
@@ -367,3 +435,95 @@ def colorize_tracks(cdb, data):
         text = ""  # f"x {id} {d.distance_um:.1f} {d.speed_boundingbox_um_min:.1f} {d.speed_stepwidth_um_min:.1f} {d.cos_angle:.1f}"
         cdb.table_track.update({cdb.table_track.style: style, cdb.table_track.text: text}).where(
             cdb.table_track.id == id).execute()
+
+
+# Magenta/green instead of red/green: distinguishable for red-green colour blindness.
+COLOR_TOWARD = "#00CC00"     # green   - toward the chemokine
+COLOR_AWAY = "#FF00FF"       # magenta - away from the chemokine
+COLOR_SIDEWAYS = "#888888"   # grey    - motile but not directional
+COLOR_NONMOTILE = "#0000FF"  # blue    - non-motile
+
+
+def _direction_color(dx, dy, axis, cos_threshold):
+    n = (dx * dx + dy * dy) ** 0.5
+    if n == 0:
+        return COLOR_SIDEWAYS
+    cos = (dx * axis[0] + dy * axis[1]) / n
+    if cos >= cos_threshold:
+        return COLOR_TOWARD
+    if cos <= -cos_threshold:
+        return COLOR_AWAY
+    return COLOR_SIDEWAYS
+
+
+def colorize_tracks_by_direction(cdb, data, axis, cos_threshold=0.5, window_frames=None,
+                                 toward_fraction=0.5, per_frame=True):
+    """Color tracks by migration direction relative to ``axis`` (unit vector toward
+    the chemokine, image x,y coords).
+
+        green = toward the chemokine (within +/-60 deg, cos >= cos_threshold)
+        red   = away from it
+        grey  = motile but sideways / non-directional
+        blue  = non-motile
+
+    Direction is evaluated per ``window_frames`` sub-segment, so a cell that changes
+    direction over time is handled properly:
+
+    * ``per_frame=True`` colors each track marker by ITS OWN window's direction, so
+      the track visibly CHANGES COLOR along its length (green while it heads toward
+      the chemokine, grey/red when it does not).
+    * The whole-track color is set from the FRACTION of windows heading toward the
+      chemokine: green if that fraction >= ``toward_fraction`` (persistently
+      chemotactic), red if the away-fraction dominates, else grey.
+
+    With ``window_frames=None`` the whole track is one window (net start->end).
+    """
+    # frame (sort_index) -> image ids, built once for the per-marker coloring
+    frame_to_images = {}
+    if per_frame:
+        for im in cdb.getImages():
+            frame_to_images.setdefault(int(im.sort_index), []).append(im.id)
+
+    for tid, g in data.groupby("id"):
+        g = g.sort_values("frame")
+        motile = bool(g["motile"].iloc[0]) if "motile" in g.columns else True
+        if not motile:
+            cdb.table_track.update({cdb.table_track.style: '{"color": "%s"}' % COLOR_NONMOTILE,
+                                    cdb.table_track.text: ""}).where(cdb.table_track.id == tid).execute()
+            continue
+
+        xy = g[["x", "y"]].values
+        frames = g["frame"].values
+        w = int(window_frames) if window_frames else len(xy)
+        w = max(2, w)
+
+        colors = []          # one per window
+        for s in range(0, max(len(xy) - 1, 1), w):
+            seg = xy[s:s + w]
+            if len(seg) < 2:
+                continue
+            c = _direction_color(seg[-1, 0] - seg[0, 0], seg[-1, 1] - seg[0, 1], axis, cos_threshold)
+            colors.append(c)
+            if per_frame:
+                # color this window's markers so the track changes color over time
+                img_ids = []
+                for f in frames[s:s + w]:
+                    img_ids.extend(frame_to_images.get(int(f), []))
+                if img_ids:
+                    cdb.table_marker.update({cdb.table_marker.style: '{"color": "%s"}' % c}).where(
+                        (cdb.table_marker.track == tid) &
+                        (cdb.table_marker.image << img_ids)).execute()
+        if not colors:
+            continue
+        frac_toward = colors.count(COLOR_TOWARD) / len(colors)
+        frac_away = colors.count(COLOR_AWAY) / len(colors)
+        if frac_toward >= toward_fraction:
+            track_color = COLOR_TOWARD
+        elif frac_away >= toward_fraction:
+            track_color = COLOR_AWAY
+        else:
+            track_color = COLOR_SIDEWAYS
+        cdb.table_track.update(
+            {cdb.table_track.style: '{"color": "%s"}' % track_color,
+             cdb.table_track.text: ""}).where(
+            cdb.table_track.id == tid).execute()

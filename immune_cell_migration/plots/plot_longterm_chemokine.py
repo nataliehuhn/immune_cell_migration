@@ -110,13 +110,26 @@ def plot_distribution_over_time(celltype, path_list, conditions, custom_order,
 
 def plot_directional_over_time(celltype, path_list, conditions, custom_order,
                                acquisition_mode, pos_num, time_step,
-                               bin_minutes=60, cos_threshold=0.5, motile_only=True):
-    """Signed chemotaxis index & fraction toward each border, per time bin."""
+                               bin_minutes=60, cos_threshold=0.5,
+                               pixelsize_ccd=3.45, objective=10, motility_window_min=5.5):
+    """Signed chemotaxis index & fraction toward each border, resolved in time.
+
+    Directionality is measured on SHORT fixed sub-segments of each track (one
+    ``motility_window_min`` window, e.g. 5.5 min), NOT on the whole track: a long
+    track that chemotaxes early then stops would otherwise smear its net
+    displacement across its whole lifetime and flatten the early-vs-late signal.
+    Each segment's net-displacement direction is attributed to its own time, then
+    averaged per ``bin_minutes`` bin. Only segments in which the cell actually
+    translocates >= the motility threshold are counted (so a cell that only starts
+    moving later never contributes to an earlier bin).
+    """
     thresh = MOTILITY_DEFINITION[celltype]
+    res = pixelsize_ccd / objective
+    step_frames = max(2, int(round(motility_window_min * 60.0 / time_step)))
     acq_sequential = ACQUISITION_MODE[acquisition_mode]
     num_conditions = len(conditions)
 
-    # (condition, time_bin) -> list of signed cosines (one per cell in that bin)
+    # (condition, time_bin) -> list of signed cosines (one per moving segment)
     cos_by = defaultdict(list)
     max_bin = 0
     for condition, pos, f, borders in _iter_condition_csvs(
@@ -124,27 +137,30 @@ def plot_directional_over_time(celltype, path_list, conditions, custom_order,
         df = pd.read_csv(f, index_col=0)
         if not {"frame", "id", "x", "y"}.issubset(df.columns):
             continue
-        if motile_only and "motile" in df.columns:
-            df = df[df["motile"] == True]
         if df.empty:
             continue
         axis = border_utils.perpendicular_vector(borders, hint=None)
         axis = axis / (np.linalg.norm(axis) or 1.0)
-        df = df.copy()
-        df["tbin"] = _time_bin(df["frame"].values, time_step, bin_minutes)
-        # per cell per time-bin: net displacement first->last frame in that bin
-        for (cell_id, tb), g in df.groupby(["id", "tbin"]):
-            if len(g) < 2:
-                continue
+
+        for cell_id, g in df.groupby("id"):
             g = g.sort_values("frame")
-            dx = g["x"].iloc[-1] - g["x"].iloc[0]
-            dy = g["y"].iloc[-1] - g["y"].iloc[0]
-            n = np.hypot(dx, dy)
-            if n == 0:
-                continue
-            cos = (dx * axis[0] + dy * axis[1]) / n
-            cos_by[(condition, int(tb))].append(cos)
-            max_bin = max(max_bin, int(tb))
+            xy = g[["x", "y"]].values
+            frames_arr = g["frame"].values
+            # walk non-overlapping short segments along the track
+            for s in range(0, len(xy) - 1, step_frames):
+                seg = xy[s:s + step_frames]
+                if len(seg) < 2:
+                    continue
+                dx = seg[-1, 0] - seg[0, 0]
+                dy = seg[-1, 1] - seg[0, 1]
+                n = np.hypot(dx, dy)
+                if n * res < thresh:        # no real translocation in this segment
+                    continue
+                cos = (dx * axis[0] + dy * axis[1]) / n
+                tb = int(frames_arr[s] * time_step / 60.0 // bin_minutes)  # bin by segment start time
+                cos_by[(condition, tb)].append(cos)
+                if tb > max_bin:
+                    max_bin = tb
 
     if not cos_by:
         print("plot_directional_over_time: no data collected")
@@ -172,7 +188,7 @@ def plot_directional_over_time(celltype, path_list, conditions, custom_order,
             fl[b] = np.mean(c <= -cos_threshold)
             rows.append({"condition": condition, "time_bin": time_labels[b],
                          "index": idx[b], "frac_right": fr[b], "frac_left": fl[b],
-                         "n_cells": int(c.size)})
+                         "n_segments": int(c.size)})
         color = cmap(ci % 10)
         ax1.plot(x, idx, "-o", color=color, label=condition)
         ax2.plot(x, fr, "-o", color=color, label=f"{condition} → right")

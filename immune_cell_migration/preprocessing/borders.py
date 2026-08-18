@@ -183,6 +183,23 @@ def normalized_position(borders, xs, ys):
     return u
 
 
+def distance_to_borders(borders, xs, ys):
+    """Horizontal distance (pixels) of points to the left and right border.
+
+    Returns ``(dist_left, dist_right)``, each measured at the point's own y so
+    border tilt is accounted for. Positive = inside the channel; negative means the
+    point lies outside that border.
+    """
+    left, right = borders
+    xs = np.asarray(xs, dtype=float)
+    ys = np.asarray(ys, dtype=float)
+    xl = _x_at_y(left, ys)
+    xr = _x_at_y(right, ys)
+    lo = np.minimum(xl, xr)
+    hi = np.maximum(xl, xr)
+    return xs - lo, hi - xs
+
+
 def perpendicular_vector(borders, hint=None):
     """Unit vector perpendicular to the borders, in image (x, y) coordinates.
 

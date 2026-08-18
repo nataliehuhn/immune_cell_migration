@@ -1,6 +1,7 @@
 import os
 import clickpoints
 from glob import glob
+from joblib import Parallel, delayed
 import torch
 import torch.nn as nn
 import numpy as np
@@ -133,22 +134,75 @@ class UNet(nn.Module):
 # Main function
 # ----------------------------
 
-def predict_cells_unet(pathlist, celltype):
+def _predict_one_composite(f, model, device, mask_dir):
+    """Run the finder on a single composite TIFF and save its mask."""
+    try:
+        img_stack = imread(f).astype(np.float32) / 255.0  # shape (6, H, W)
+        H = img_stack.shape[1]
+        W = img_stack.shape[2]
+
+        img_stack = pad_to_divisible(img_stack)
+        img_tensor = torch.from_numpy(img_stack).unsqueeze(0).to(device)
+
+        with torch.no_grad():
+            pred = model(img_tensor)
+            pred_prob = pred[0, 0].cpu().numpy()
+
+        pred_bin = pred_prob > 0.5
+        pred_bin = ndi.binary_fill_holes(pred_bin)
+        pred_bin = binary_opening(pred_bin, footprint=disk(1))
+        pred_bin = binary_closing(pred_bin, footprint=disk(1))
+        pred_bin = remove_small_objects(pred_bin, min_size=10)
+
+        # Save mask (use Zmin channel = channel 4 as base)
+        mask_img = (np.clip(img_stack[4] * pred_bin, 0, 1) * 255).astype(np.uint8)
+        # Remove the extra rows/columns added by pad_to_divisible
+        mask_img = mask_img[:H, :W]
+
+        pal_img = Image.fromarray(mask_img, mode='P')
+        pal_img.putpalette(JET_PAL)
+        pal_img.save(os.path.join(mask_dir, os.path.basename(f)), compression='tiff_lzw')
+    except Exception as e:
+        print(f"Error processing {f}: {e}")
+
+
+def _load_finder(finder_path, device):
+    model = UNet().to(device)
+    model.load_state_dict(torch.load(finder_path, map_location=device))
+    model.eval()
+    return model
+
+
+def _predict_chunk(files, finder_path, mask_dir, threads):
+    """Worker: load the model once and process a chunk of composites (CPU, limited threads)."""
+    try:
+        torch.set_num_threads(max(1, int(threads)))
+    except Exception:
+        pass
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = _load_finder(finder_path, device)
+    for f in files:
+        _predict_one_composite(f, model, device, mask_dir)
+    return len(files)
+
+
+def predict_cells_unet(pathlist, celltype, n_jobs=1):
     """
     Predict cells on composite TIFFs using the UNet finder model.
-    Saves one mask per repetition/position in the /Mask folder.
-    """
-    # Auto-detect device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    Saves one mask per repetition/position in the /masks folder.
 
-    # Resolve model path relative to this script
+    ``n_jobs`` > 1 spreads the composites over that many worker processes (useful
+    on CPU: detection is embarrassingly parallel per frame). The available torch
+    threads are split across workers to avoid oversubscription. A CUDA GPU, when
+    present, is used automatically and is fast enough that n_jobs=1 is fine.
+    """
+    import multiprocessing
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     script_dir = os.path.dirname(os.path.abspath(__file__))
     finder_path = os.path.join(script_dir, TRAINED_NETWORKS[celltype]["trained_file"])
 
-    # Load finder model
-    model_finder = UNet().to(device)
-    model_finder.load_state_dict(torch.load(finder_path, map_location=device))
-    model_finder.eval()
+    parallel = (n_jobs and n_jobs > 1 and not torch.cuda.is_available())
 
     for item in pathlist:
         base_dir = item[0] if isinstance(item, (list, tuple)) else item
@@ -161,40 +215,20 @@ def predict_cells_unet(pathlist, celltype):
             print(f"No composite TIFF files found in {composites_dir}")
             continue
 
-        # Process each composite TIFF (each rep/pos)
-        for f in tqdm(tiff_files, desc=f"Processing {base_dir}"):
-            try:
-                img_stack = imread(f).astype(np.float32) / 255.0  # shape (6, H, W)
-                H = img_stack.shape[1]
-                W = img_stack.shape[2]
-
-                img_stack = pad_to_divisible(img_stack)
-                img_tensor = torch.from_numpy(img_stack).unsqueeze(0).to(device)
-
-                with torch.no_grad():
-                    pred = model_finder(img_tensor)
-                    pred_prob = pred[0, 0].cpu().numpy()
-
-                pred_bin = pred_prob > 0.5
-                pred_bin = ndi.binary_fill_holes(pred_bin)
-                pred_bin = binary_opening(pred_bin, footprint=disk(1))
-                pred_bin = binary_closing(pred_bin, footprint=disk(1))
-                pred_bin = remove_small_objects(pred_bin, min_size=10)
-
-                # Save mask (use Zmin channel = channel 4 as base)
-                mask_img = (np.clip(img_stack[4] * pred_bin, 0, 1) * 255).astype(np.uint8)
-
-                # Make sure extra pixel rows/columns by UNET model are removed again
-                mask_img = mask_img[:H, :W]
-
-                mask_out = os.path.join(mask_dir, os.path.basename(f))
-
-                pal_img = Image.fromarray(mask_img, mode='P')
-                pal_img.putpalette(JET_PAL)
-                pal_img.save(mask_out, compression='tiff_lzw')
-
-            except Exception as e:
-                print(f"Error processing {f}: {e}")
+        if parallel and len(tiff_files) > 1:
+            nj = min(int(n_jobs), len(tiff_files))
+            threads = max(1, multiprocessing.cpu_count() // nj)
+            chunks = [tiff_files[i::nj] for i in range(nj)]  # round-robin split
+            print(f"Detecting {len(tiff_files)} composites in {base_dir} "
+                  f"with {nj} workers x {threads} threads")
+            Parallel(n_jobs=nj)(
+                delayed(_predict_chunk)(chunk, finder_path, mask_dir, threads)
+                for chunk in chunks
+            )
+        else:
+            model = _load_finder(finder_path, device)
+            for f in tqdm(tiff_files, desc=f"Processing {base_dir}"):
+                _predict_one_composite(f, model, device, mask_dir)
 
 
 def write_masks_to_cdb(pathlist):

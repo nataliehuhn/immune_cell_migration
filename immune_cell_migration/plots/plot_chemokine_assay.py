@@ -50,11 +50,15 @@ def extract_motile_directions(files):
 
         disp["dx"] = disp["x_end"] - disp["x_start"]
         disp["dy"] = disp["y_end"] - disp["y_start"]
+        # representative position of the cell (track midpoint) used to assign it
+        # to the left/right half of the channel
+        disp["x_pos"] = 0.5 * (disp["x_start"] + disp["x_end"])
+        disp["y_pos"] = 0.5 * (disp["y_start"] + disp["y_end"])
 
-        all_entries.append(disp[["id", "dx", "dy"]])
+        all_entries.append(disp[["id", "dx", "dy", "x_pos", "y_pos"]])
 
     if not all_entries:
-        return pd.DataFrame(columns=["id", "dx", "dy"])
+        return pd.DataFrame(columns=["id", "dx", "dy", "x_pos", "y_pos"])
 
     return pd.concat(all_entries, ignore_index=True)
 
@@ -311,6 +315,131 @@ def plot_fraction_toward_chemokine(
         plt.savefig(outpath, dpi=300)
         plt.close()
 
+        print(f"Saved: {outpath}")
+
+
+def plot_directional_by_half(
+    celltype,
+    path_list,
+    conditions,
+    custom_order,
+    chemokine_direction,
+    acquisition_mode,
+    pos_num,
+    split=0.5,
+):
+    """
+    Directionality computed separately for the LEFT and RIGHT half of the channel.
+
+    Each motile cell is assigned to a half by its normalized position u in [0, 1]
+    (0 = left border, 1 = right border): left half if u < ``split``, right half
+    otherwise. Within each half the signed chemotaxis index and the fraction of
+    cells moving toward the right border are computed against the border-
+    perpendicular axis. Requires borders (the halves are defined by them); a
+    position without borders is skipped.
+
+    Writes one figure + a ``directional_by_half.csv`` per timepoint folder.
+    """
+    thresh_motile = MOTILITY_DEFINITION[celltype]
+    acq_sequential = ACQUISITION_MODE[acquisition_mode]
+    num_conditions = len(conditions)
+
+    for path, _ in path_list:
+        print(f"Processing path (by-half): {path}")
+        cache = {}
+
+        def axis_borders(pos):
+            if pos not in cache:
+                ref = border_utils.reference_cdb_for_pos(path, pos)
+                bd = border_utils.load_borders_from_path(ref)
+                ax = None if bd is None else border_utils.perpendicular_vector(bd, hint=None)
+                cache[pos] = (ax, bd)
+            return cache[pos]
+
+        # match CSV files to conditions (same convention as the other plots)
+        condition_files = [[] for _ in range(num_conditions)]
+        for cond_idx in range(num_conditions):
+            for f in glob.glob(os.path.join(path, "*" + str(thresh_motile) + "umin*.csv")):
+                position = int(f.split("_")[-4][3:])
+                keep = (position // pos_num == cond_idx) if acq_sequential \
+                    else (position % num_conditions == cond_idx)
+                if keep:
+                    condition_files[cond_idx].append(f)
+
+        rows = []
+        for cond_idx, condition_name in enumerate(conditions):
+            files = condition_files[cond_idx]
+            positions = sorted({int(f.split("_")[-4][3:]) for f in files})
+            for pos in positions:
+                files_pos = [f for f in files if int(f.split("_")[-4][3:]) == pos]
+                df_dir = extract_motile_directions(files_pos)
+                axis, borders = axis_borders(pos)
+                if borders is None or axis is None or df_dir.empty:
+                    if borders is None:
+                        print(f"  pos{pos:02d}: no borders, skipping half-split")
+                    continue
+                u = border_utils.normalized_position(borders, df_dir["x_pos"].values, df_dir["y_pos"].values)
+                df_dir = df_dir.assign(u=u)
+                df_dir = df_dir[np.isfinite(df_dir["u"])]
+                for half, sub in (("left", df_dir[df_dir["u"] < split]),
+                                  ("right", df_dir[df_dir["u"] >= split])):
+                    index, frac_right, frac_left = compute_direction_metrics(sub, axis)
+                    rows.append({"condition": condition_name, "position": pos, "half": half,
+                                 "index": index, "frac_right": frac_right,
+                                 "frac_left": frac_left, "n_cells": int(len(sub))})
+
+        df_plot = pd.DataFrame(rows)
+        if df_plot.empty:
+            print(f"  no border-based data for {path}; skipping by-half plot")
+            continue
+        df_plot["condition"] = pd.Categorical(df_plot["condition"], categories=custom_order, ordered=True)
+        df_plot = df_plot.sort_values("condition")
+        df_plot.to_csv(os.path.join(path, "directional_by_half.csv"), index=False)
+
+        stats = df_plot.groupby(["condition", "half"]).agg(
+            index_mean=("index", "mean"), index_sem=("index", "sem"),
+            right_mean=("frac_right", "mean"), right_sem=("frac_right", "sem"),
+        ).reset_index()
+
+        conds = [c for c in custom_order if c in set(stats["condition"].astype(str))]
+        x = np.arange(len(conds))
+        w = 0.4
+        colors = {"left": "#4C72B0", "right": "#DD8452"}
+
+        def series(half, col):
+            vals = []
+            for c in conds:
+                r = stats[(stats["condition"].astype(str) == c) & (stats["half"] == half)]
+                vals.append(r[col].values[0] if len(r) else np.nan)
+            return np.array(vals)
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(max(1.6 * len(conds), 7), 4.4))
+        for k, half in enumerate(("left", "right")):
+            ax1.bar(x + (k - 0.5) * w, series(half, "index_mean"), width=w,
+                    yerr=series(half, "index_sem"), capsize=4, edgecolor="black",
+                    color=colors[half], label=f"{half} half")
+        ax1.axhline(0.0, color="black", lw=0.8)
+        ax1.set_ylim(-1, 1)
+        ax1.set_ylabel("Chemotaxis index (+ = toward right border)")
+        ax1.set_title("Signed index by channel half")
+        ax1.set_xticks(x); ax1.set_xticklabels(conds, rotation=45, ha="right")
+        ax1.legend(fontsize=8)
+
+        for k, half in enumerate(("left", "right")):
+            ax2.bar(x + (k - 0.5) * w, series(half, "right_mean"), width=w,
+                    yerr=series(half, "right_sem"), capsize=4, edgecolor="black",
+                    color=colors[half], label=f"{half} half")
+        ax2.axhline(0.33, color="black", ls="--", lw=1, alpha=0.6)
+        ax2.set_ylim(0, 1)
+        ax2.set_ylabel("Fraction toward right border (±60°)")
+        ax2.set_title("Fraction toward right border by half")
+        ax2.set_xticks(x); ax2.set_xticklabels(conds, rotation=45, ha="right")
+        ax2.legend(fontsize=8)
+
+        outpath = os.path.join(path, "plot_directional_by_half.png")
+        plt.tight_layout()
+        plt.savefig(outpath, dpi=300)
+        plt.close()
         print(f"Saved: {outpath}")
 
 

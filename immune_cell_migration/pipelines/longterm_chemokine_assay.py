@@ -34,6 +34,7 @@ from ..postprocessing import motility_filter_cdb
 from ..postprocessing import write_to_excel
 from ..plots import plot_mf_speed_pers
 from ..plots import plot_longterm_chemokine
+from ..plots import chemotaxis_metrics
 
 
 def _is_position_corrected(outfolder, pos):
@@ -43,7 +44,12 @@ def _is_position_corrected(outfolder, pos):
 def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode, savename,
                       order, chem_dir, rep_spacing, downsampling_factor,
                       bin_minutes=60, pixelsize_ccd=3.45, objective=10,
-                      drift_subsample=10,
+                      drift_subsample=10, drift_sequential=True, drift_handover=10, drift_reg_downsample=4,
+                      motility_window_min=5.5, metrics_max_minutes=120,
+                      directionality_bin_min=30, color_window_min=15, border_edge_um=15.0, n_space_bins=6, angular_coarse_frames=3,
+                      extra_plots=(),
+                      drift_threshold=None, drift_correct=True,
+                      slow_percentile=25, rose_window_min=None,
                       drift_corr=True, clickpoints_db=True, detection=True, tracking=True,
                       postprocessing=True, plotting=True, n_jobs=1, require_borders=False):
     """
@@ -67,7 +73,9 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
         if remaining:
             print(f"Correcting {len(remaining)}/{len(positions)} positions in: {corrected}")
             Parallel(n_jobs=n_jobs)(
-                delayed(correct_drift_longterm)(folder, pos, corrected, drift_subsample)
+                delayed(correct_drift_longterm)(folder, pos, corrected, drift_subsample,
+                                                sequential=drift_sequential, handover=drift_handover,
+                                                reg_downsample=drift_reg_downsample)
                 for pos in remaining
             )
         else:
@@ -96,15 +104,18 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
             return
 
     if detection:
-        cell_finder_ben.predict_cells_unet(pathlist, celltype)
+        cell_finder_ben.predict_cells_unet(pathlist, celltype, n_jobs=n_jobs)
         cell_finder_ben.write_masks_to_cdb(pathlist)
 
     if tracking:
-        cell_tracker_ben.track_cells(pathlist)
+        cell_tracker_ben.track_cells(pathlist, n_jobs=n_jobs)
 
     if postprocessing:
         motility_filter_cdb.filter_cdb(time_step=time_step, celltype=celltype, path_list=pathlist,
-                                       pixelsize_ccd=pixelsize_ccd, objective=objective)
+                                       pixelsize_ccd=pixelsize_ccd, objective=objective,
+                                       motility_window_min=motility_window_min,
+                                       colorize_direction=True, chemokine_direction=chem_dir,
+                                       color_window_min=color_window_min)  # cdb colouring window (e.g. 15 min)
         print("cdb filtering done")
         write_to_excel.excel_writer(celltype=celltype, path_list=pathlist, savename=savename,
                                     conditions=conditions, acquisition_mode=acq_mode, pos_num=pos_num)
@@ -120,6 +131,45 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
         plot_longterm_chemokine.plot_distribution_over_time(
             celltype=celltype, path_list=pathlist, conditions=conditions, custom_order=order,
             acquisition_mode=acq_mode, pos_num=pos_num, time_step=time_step, bin_minutes=bin_minutes)
+        # directionality of the motile cells over time, in its own (e.g. 30-min) windows
         plot_longterm_chemokine.plot_directional_over_time(
             celltype=celltype, path_list=pathlist, conditions=conditions, custom_order=order,
-            acquisition_mode=acq_mode, pos_num=pos_num, time_step=time_step, bin_minutes=bin_minutes)
+            acquisition_mode=acq_mode, pos_num=pos_num, time_step=time_step,
+            bin_minutes=directionality_bin_min,
+            pixelsize_ccd=pixelsize_ccd, objective=objective, motility_window_min=motility_window_min)
+
+        # ---- optional extra analyses, selected via `extra_plots` ----
+        # (drift is corrected inside the metrics via slow-cell subtraction)
+        mkw = dict(celltype=celltype, path_list=pathlist, conditions=conditions, custom_order=order,
+                   acquisition_mode=acq_mode, pos_num=pos_num, time_step=time_step,
+                   pixelsize_ccd=pixelsize_ccd, objective=objective,
+                   max_minutes=metrics_max_minutes,
+                   directionality_window_min=directionality_bin_min,
+                   motility_window_min=motility_window_min,
+                   drift_threshold=drift_threshold, drift_correct=drift_correct,
+                   slow_percentile=slow_percentile)
+        extras = set(extra_plots or ())
+        if "fmi" in extras:            # Forward Migration Index (parallel/perpendicular)
+            chemotaxis_metrics.plot_fmi(**mkw)
+        if "speed" in extras:
+            # speed + straightness per direction class, on the SAME window as the cdb
+            # colouring, so the bars match what you see coloured in clickpoints
+            skw = dict(mkw, directionality_window_min=color_window_min)
+            chemotaxis_metrics.plot_speed_gradient(**skw)
+        if "rose" in extras:           # angle roses across time windows
+            chemotaxis_metrics.plot_rose_over_time(rose_window_min=rose_window_min, **mkw)
+        if "map" in extras:            # WHERE chemotaxis happens, and how it shifts in time
+            chemotaxis_metrics.plot_chemotaxis_map(n_space_bins=n_space_bins, **mkw)
+        if "angular" in extras:        # torque vs angular-noise decomposition (Jakuszeit et al.)
+            chemotaxis_metrics.plot_angular_dynamics(
+                celltype=celltype, path_list=pathlist, conditions=conditions, custom_order=order,
+                acquisition_mode=acq_mode, pos_num=pos_num, time_step=time_step,
+                pixelsize_ccd=pixelsize_ccd, objective=objective, max_minutes=metrics_max_minutes,
+                coarse_frames=angular_coarse_frames, drift_correct=drift_correct,
+                slow_percentile=slow_percentile)
+        if "exits" in extras:          # cells escaping through the right vs left border
+            chemotaxis_metrics.plot_border_exits(
+                celltype=celltype, path_list=pathlist, conditions=conditions, custom_order=order,
+                acquisition_mode=acq_mode, pos_num=pos_num, time_step=time_step,
+                pixelsize_ccd=pixelsize_ccd, objective=objective, max_minutes=metrics_max_minutes,
+                edge_um=border_edge_um)
