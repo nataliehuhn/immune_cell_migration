@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 
 from ..preprocessing import borders as border_utils
 
-MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13, "Treg": 13}
+MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13, "Treg": 13, "Treg_trick": 13}
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}
 
 
@@ -191,6 +191,8 @@ def collect_segments(path, celltype, conditions, acquisition_mode, pos_num, time
             border_cache[pos] = border_utils.load_borders_from_path(ref)
         borders = border_cache[pos]
         if borders is None:
+            print(f"  WARNING: no border lines for pos{pos:02d} "
+                  f"(looked in {path} and its 0h_corrected sibling) - skipping")
             continue
         axis = border_utils.perpendicular_vector(borders, hint=None)
         axis = axis / (np.linalg.norm(axis) or 1.0)
@@ -421,6 +423,8 @@ def collect_angular_steps(path, celltype, conditions, acquisition_mode, pos_num,
         borders = border_utils.load_borders_from_path(
             border_utils.reference_cdb_for_pos(path, pos))
         if borders is None:
+            print(f"  WARNING: no border lines for pos{pos:02d} "
+                  f"(looked in {path} and its 0h_corrected sibling) - skipping")
             continue
         axis = border_utils.perpendicular_vector(borders, hint=None)
         axis = axis / (np.linalg.norm(axis) or 1.0)
@@ -668,6 +672,8 @@ def plot_border_exits(celltype, path_list, conditions, custom_order, acquisition
             ref = border_utils.reference_cdb_for_pos(path, pos)
             borders = border_utils.load_borders_from_path(ref)
             if borders is None:
+                print(f"  WARNING: no border lines for pos{pos:02d} "
+                      f"(looked in {path} and its 0h_corrected sibling) - skipping")
                 continue
             df = pd.read_csv(f, index_col=0)
             if not {"id", "x", "y", "frame"}.issubset(df.columns):

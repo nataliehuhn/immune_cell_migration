@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 from ..preprocessing import borders as border_utils
 from . import _axis_distribution
 
-MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13, "Treg": 13}
+MOTILITY_DEFINITION = {"NK": 6.5, "pigPBMCs": 6.0, "Jurkat": 4.0, "NK_day14": 13, "Treg": 13, "Treg_trick": 13}
 ACQUISITION_MODE = {"skip": 0, "sequential": 1}
 
 
@@ -51,6 +51,8 @@ def _iter_condition_csvs(path_list, thresh, acq_sequential, num_conditions, pos_
             cdb = _cdb_for_csv(f)
             borders = border_utils.load_borders_from_path(cdb)
             if borders is None:
+                print(f"  WARNING: no border lines for pos{pos:02d} "
+                      f"(looked in {path} and its 0h_corrected sibling) - skipping")
                 continue
             yield conditions[cond_idx], pos, f, borders
 

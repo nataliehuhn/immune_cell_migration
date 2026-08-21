@@ -52,15 +52,34 @@ def reference_folder(any_path, reference_folder_name=REFERENCE_FOLDER_NAME):
     return os.path.join(parent, reference_folder_name)
 
 
-def reference_cdb_for_pos(any_path, pos, reference_folder_name=REFERENCE_FOLDER_NAME):
-    """Find the reference (0h) cdb for a given position, or None."""
-    ref = reference_folder(any_path, reference_folder_name)
-    if pos is None or not os.path.isdir(ref):
+def _cdb_for_pos_in(folder, pos):
+    """The cdb of a given position inside ``folder``, or None."""
+    if pos is None or not os.path.isdir(folder):
         return None
-    for f in sorted(glob.glob(os.path.join(ref, "*.cdb"))):
+    for f in sorted(glob.glob(os.path.join(folder, "*.cdb"))):
         if _pos_from_filename(f) == pos:
             return f
     return None
+
+
+def reference_cdb_for_pos(any_path, pos, reference_folder_name=REFERENCE_FOLDER_NAME):
+    """Find the cdb that holds the border lines for a given position, or None.
+
+    Looks in ``any_path`` itself FIRST: in the long-term assay there is only one
+    measurement folder and the borders are drawn in that position's own database,
+    whatever the folder is called. Only if no borders are found there do we fall
+    back to the sibling ``0h_corrected`` folder used by the multi-timepoint assay
+    (where 1h/2h/... databases carry no lines of their own).
+    """
+    base = os.path.abspath(any_path)
+    if not os.path.isdir(base):
+        base = os.path.dirname(base)
+
+    own = _cdb_for_pos_in(base, pos)
+    if own is not None and load_borders_from_path(own) is not None:
+        return own
+
+    return _cdb_for_pos_in(reference_folder(any_path, reference_folder_name), pos)
 
 
 def find_reference_cdb(cdb_path, reference_folder_name=REFERENCE_FOLDER_NAME):
