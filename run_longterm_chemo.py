@@ -15,7 +15,7 @@ Workflow for this dataset:
 
 If borders are still missing, the run stops before detection and lists which
 databases need them (require_borders=True), so you can just run it again.
-"""
+
 import immune_cell_migration as icm
 
 FOLDER = r"Z:\nhuhn\Microscopy\mic2_mic3\Asal\20260819_human_tcells_ccl19\start"
@@ -34,6 +34,7 @@ icm.pipelines.longterm_chemokine_assay.complete_pipeline(
     drift_corr=False, clickpoints_db=False, detection=False, tracking=False, postprocessing=True, plotting=True,
     require_borders=True, n_jobs=8)
 """
+import immune_cell_migration as icm
 FOLDER = r"Z:\nhuhn\Microscopy\mic2_mic3\Asal\20260819_human_tcells_ccl19\before"
 
 icm.pipelines.longterm_chemokine_assay.complete_pipeline(
@@ -47,6 +48,5 @@ icm.pipelines.longterm_chemokine_assay.complete_pipeline(
     metrics_max_minutes=240, color_window_min=15, directionality_bin_min=30,
     extra_plots=("fmi", "speed", "rose", "map", "exits", "angular"),
     rose_window_min=None, bin_minutes=15, pixelsize_ccd=3.45, #drift_subsample=10,
-    drift_corr=False, clickpoints_db=True, detection=True, tracking=True, postprocessing=True, plotting=True,
+    drift_corr=False, clickpoints_db=False, detection=False, tracking=False, postprocessing=True, plotting=True,
     require_borders=True, n_jobs=8)
-"""

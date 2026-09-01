@@ -122,10 +122,23 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
         print("excel files written")
 
     if plotting:
-        # speed / persistence / motile fraction (folder-based, reused as-is)
-        plot_mf_speed_pers.plot_motile_fractions(parent_folder=folder, custom_order=order)
-        plot_mf_speed_pers.plot_speed(parent_folder=folder, custom_order=order)
-        plot_mf_speed_pers.plot_persistence(parent_folder=folder, custom_order=order)
+        # speed / persistence / motile fraction (folder-based, reused as-is).
+        # NOTE: must point at the CORRECTED folder - that is where the xlsx lives;
+        # walking the raw folder finds nothing (it is a sibling, not a parent).
+        mf_folder = pathlist[0][0]
+        plot_mf_speed_pers.plot_motile_fractions(parent_folder=mf_folder, custom_order=order)
+        plot_mf_speed_pers.plot_speed(parent_folder=mf_folder, custom_order=order)
+        plot_mf_speed_pers.plot_persistence(parent_folder=mf_folder, custom_order=order)
+
+        # motility resolved in time (the folder-based plots above collapse the whole
+        # measurement into one value, since a long-term run has a single folder)
+        chemotaxis_metrics.plot_motility_over_time(
+            celltype=celltype, path_list=pathlist, conditions=conditions, custom_order=order,
+            acquisition_mode=acq_mode, pos_num=pos_num, time_step=time_step,
+            pixelsize_ccd=pixelsize_ccd, objective=objective,
+            bin_minutes=directionality_bin_min, motility_window_min=motility_window_min,
+            max_minutes=metrics_max_minutes, drift_correct=drift_correct,
+            slow_percentile=slow_percentile)
 
         # time-resolved chemokine analysis (binned within each database)
         plot_longterm_chemokine.plot_distribution_over_time(

@@ -391,6 +391,71 @@ def plot_speed_gradient(celltype, path_list, conditions, custom_order, acquisiti
         print(f"Saved: {out}")
 
 
+def plot_motility_over_time(celltype, path_list, conditions, custom_order, acquisition_mode,
+                            pos_num, time_step, pixelsize_ccd=3.45, objective=10,
+                            bin_minutes=30.0, motility_window_min=5.5, max_minutes=None,
+                            drift_correct=True, slow_percentile=25, min_segments=5):
+    """Motile fraction and speed of the moving cells, resolved in time.
+
+    The folder-based motile-fraction/speed plots give one value for a whole
+    measurement, which for a long continuous run collapses the entire experiment
+    into a single number. Here every cell is scored per ``bin_minutes`` window:
+
+        motile fraction = windows in which the cell moves >= the motility
+                          threshold / all windows in that time bin
+        speed           = mean path speed of the MOVING windows only
+
+    so you can see whether cells become more (or less) motile over the hours, and
+    whether the speed of the movers changes. Writes ``motility_over_time.csv`` +
+    ``plot_motility_over_time.png``.
+    """
+    for path, _ in path_list:
+        df = collect_segments(path, celltype, conditions, acquisition_mode, pos_num, time_step,
+                              pixelsize_ccd, objective, bin_minutes, motility_window_min,
+                              max_minutes, None, drift_correct, slow_percentile,
+                              keep_nonmoving=True)          # need non-movers for the fraction
+        if df.empty:
+            print(f"  no segments for motility-over-time in {path}")
+            continue
+        order = _ordered(df, custom_order)
+        df = df.assign(tbin=(df["time_min"] // bin_minutes).astype(int))
+        t_bins = sorted(df["tbin"].unique())
+        centers = [(t + 0.5) * bin_minutes for t in t_bins]
+
+        rows = []
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.2))
+        cmap = plt.get_cmap("tab10")
+        for ci, cond in enumerate(order):
+            sub = df[df["condition"] == cond]
+            frac, spd, spd_se = [], [], []
+            for t in t_bins:
+                s = sub[sub["tbin"] == t]
+                mov = s[s["moving"]]
+                if len(s) < min_segments:
+                    frac.append(np.nan); spd.append(np.nan); spd_se.append(np.nan); continue
+                frac.append(s["moving"].mean())
+                spd.append(mov["speed"].mean() if len(mov) else np.nan)
+                spd_se.append(mov["speed"].sem() if len(mov) > 1 else np.nan)
+                rows.append({"condition": cond, "time_min": (t + 0.5) * bin_minutes,
+                             "motile_fraction": frac[-1], "speed_moving": spd[-1],
+                             "speed_sem": spd_se[-1], "n_windows": int(len(s))})
+            col = cmap(ci % 10)
+            ax1.plot(centers, frac, "-o", color=col, label=cond)
+            ax2.errorbar(centers, spd, yerr=spd_se, fmt="-o", color=col, capsize=2, label=cond)
+
+        ax1.set_ylim(0, 1)
+        ax1.set_ylabel("motile fraction")
+        ax1.set_xlabel("time (min)")
+        ax2.set_ylabel("speed of moving cells (µm/min)")
+        ax2.set_xlabel("time (min)")
+        ax1.legend(fontsize=8, frameon=False)
+        fig.tight_layout()
+        pd.DataFrame(rows).to_csv(os.path.join(path, "motility_over_time.csv"), index=False)
+        out = os.path.join(path, "plot_motility_over_time.png")
+        fig.savefig(out, dpi=200); plt.close()
+        print(f"Saved: {out}")
+
+
 def _wrap(a):
     """Wrap angles to (-pi, pi]."""
     return (np.asarray(a) + np.pi) % (2 * np.pi) - np.pi
