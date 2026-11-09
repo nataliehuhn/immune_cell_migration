@@ -97,13 +97,18 @@ def find_reference_cdb(cdb_path, reference_folder_name=REFERENCE_FOLDER_NAME):
 BORDER_TYPE_KEYS = ("border", "boarder")
 
 
+def _is_border_name(name):
+    """True if a marker-type name looks like a border."""
+    name = (name or "").lower()
+    return any(key in name for key in BORDER_TYPE_KEYS)
+
+
 def _is_border_line(line):
     """True if the line's marker type looks like a border (by name)."""
     try:
-        name = (line.type.name or "").lower()
+        return _is_border_name(line.type.name)
     except Exception:
         return False
-    return any(key in name for key in BORDER_TYPE_KEYS)
 
 
 def read_borders(cdb):
@@ -154,6 +159,46 @@ def cdbs_missing_borders(folder_with_cdbs):
         if load_borders_from_path(f) is None:
             missing.append(f)
     return missing
+
+
+BORDER_TYPE_NAME = "border"
+BORDER_TYPE_COLOR = "#FFFF00"  # yellow, so it stands out on the grey phase images
+
+
+def ensure_border_marker_type(db, name=BORDER_TYPE_NAME, color=BORDER_TYPE_COLOR):
+    """Make sure an open database offers a yellow line marker type for borders.
+
+    Called right after a database is created, so the only thing left to do is to
+    open it in clickpoints, pick the (already present) "border" line type and draw
+    the two lines. Existing line types whose name looks like a border are left
+    alone - we don't want to duplicate a "boarder" type someone already drew into.
+    """
+    for t in db.getMarkerTypes():
+        if t.mode == db.TYPE_Line and _is_border_name(t.name):
+            return t
+    return db.setMarkerType(name, color, mode=db.TYPE_Line)
+
+
+def ensure_border_marker_type_in_path(cdb_path, name=BORDER_TYPE_NAME, color=BORDER_TYPE_COLOR):
+    """``ensure_border_marker_type`` for a database given by path."""
+    import clickpoints
+    with clickpoints.DataFile(cdb_path) as db:
+        ensure_border_marker_type(db, name, color)
+
+
+def ensure_border_marker_types_in_folder(folder, name=BORDER_TYPE_NAME, color=BORDER_TYPE_COLOR):
+    """Add the yellow border line type to every cdb in ``folder``.
+
+    Retrofit for datasets whose databases were created before this existed: no
+    need to re-run drift correction or cdb prep, just call this on the corrected
+    folder and the type is there next time you open the databases.
+    Returns the list of databases touched.
+    """
+    touched = []
+    for f in sorted(glob.glob(os.path.join(folder, "*.cdb"))):
+        ensure_border_marker_type_in_path(f, name, color)
+        touched.append(f)
+    return touched
 
 
 def _x_at_y(seg, ys):

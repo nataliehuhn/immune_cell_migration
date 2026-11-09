@@ -99,6 +99,9 @@ def complete_pipeline(folder, time_step, conditions, pos_num, celltype, acq_mode
             print(f"Draw two 'boarder' (TYPE_Line) markers into the FIRST frame of each "
                   f"database below (in {target}), then re-run this exact call:")
             for m in missing:
+                # the yellow 'border' line type is added here too, so databases
+                # made before this existed are also ready to draw into
+                border_utils.ensure_border_marker_type_in_path(m)
                 print("   -", os.path.basename(m))
             print("Stopping before detection until borders are present.\n")
             return

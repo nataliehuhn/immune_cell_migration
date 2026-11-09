@@ -6,6 +6,7 @@ import os
 import numpy as np
 
 from ..utils import name_glob, get_value, name_glob_files
+from . import borders as border_utils
 
 
 def prep_clickpoints_databases(path_list):
@@ -50,6 +51,9 @@ def prep_clickpoints_databases(path_list):
                 final_name = os.path.join(p, measurement_date_id + "_" + pos + "_" + mode + ".cdb")
                 if os.path.exists(final_name):
                     print('Existing pos ', pos)
+                    # database already there - still make sure the yellow border
+                    # line type is offered, so borders can be drawn right away
+                    border_utils.ensure_border_marker_type_in_path(final_name)
                     continue
                 pic_path = os.path.join(p, measurement_date_id + '*_' + pos + "*_" + mode + '*.tif')
                 create_database(final_name, pic_path)
@@ -64,6 +68,9 @@ def create_database(database_name, pic_path):
     except peewee.OperationalError:
         print(database_name)
         raise
+
+    # yellow TYPE_Line marker type, ready for the two channel borders
+    border_utils.ensure_border_marker_type(db)
 
     # Workaround base layer issue
     base = db.getLayer('MinProj', create=True)

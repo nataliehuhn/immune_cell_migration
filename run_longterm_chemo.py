@@ -33,20 +33,25 @@ icm.pipelines.longterm_chemokine_assay.complete_pipeline(
     rose_window_min=None, bin_minutes=15, pixelsize_ccd=3.45, #drift_subsample=10,
     drift_corr=False, clickpoints_db=False, detection=False, tracking=False, postprocessing=True, plotting=True,
     require_borders=True, n_jobs=8)
+
 """
+
 import immune_cell_migration as icm
-FOLDER = r"Z:\nhuhn\Microscopy\mic2_mic3\Asal\20260819_human_tcells_ccl19\before"
+
+
+FOLDER = r"Z:\nhuhn\Microscopy\mic2_mic3\chemotaxis\20261030_ibidi_Jurkat_CXCL12_10-30-100ng\after_CXCL12"
 
 icm.pipelines.longterm_chemokine_assay.complete_pipeline(
     folder=FOLDER,
-    time_step=60,
-    conditions=["no_treatment"],   # <- set real CXCL12 concentrations
-    pos_num=1, celltype="Treg_trick", acq_mode="sequential", savename="results",
-    order=["no_treatment"],
+    time_step=120,
+    conditions=["CXCL12_10ng", "CXCL12_30ng", "CXCL12_100ng"],
+    pos_num=1, celltype="Jurkat", acq_mode="sequential", savename="results",
+    order=["CXCL12_10ng", "CXCL12_30ng", "CXCL12_100ng"],
     chem_dir="right", rep_spacing=1, downsampling_factor=2,
     drift_sequential=True, drift_handover=10, drift_reg_downsample=4, border_edge_um=30.0,
     metrics_max_minutes=240, color_window_min=15, directionality_bin_min=30,
     extra_plots=("fmi", "speed", "rose", "map", "exits", "angular"),
     rose_window_min=None, bin_minutes=15, pixelsize_ccd=3.45, #drift_subsample=10,
     drift_corr=False, clickpoints_db=False, detection=False, tracking=False, postprocessing=True, plotting=True,
-    require_borders=True, n_jobs=8)
+    require_borders=True, n_jobs=5)
+
